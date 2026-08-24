@@ -37,8 +37,12 @@ import {
   getDashboardOverview,
   type DashboardOverview,
 } from "@/services/patient-service";
+import { useAuth } from "@/context/auth-context";
 
 export default function DashboardPage() {
+  const { profile: authProfile } = useAuth();
+  const isAdmin = authProfile?.role === "admin";
+
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [smartData, setSmartData] = useState<SmartInsightsData | null>(null);
   const [intelligence, setIntelligence] = useState<ComprehensiveIntelligence | null>(null);
@@ -188,7 +192,7 @@ export default function DashboardPage() {
         <HealthForecastCard
           predictions={predictions}
           modelVersion={modelVersion}
-          onOpenDiagnostics={() => setIsDiagnosticsOpen(true)}
+          onOpenDiagnostics={isAdmin ? () => setIsDiagnosticsOpen(true) : undefined}
         />
       )}
 
@@ -290,10 +294,12 @@ export default function DashboardPage() {
         }}
       />
 
-      <DeveloperDiagnosticsModal
-        isOpen={isDiagnosticsOpen}
-        onClose={() => setIsDiagnosticsOpen(false)}
-      />
+      {isAdmin && (
+        <DeveloperDiagnosticsModal
+          isOpen={isDiagnosticsOpen}
+          onClose={() => setIsDiagnosticsOpen(false)}
+        />
+      )}
     </div>
   );
 }
