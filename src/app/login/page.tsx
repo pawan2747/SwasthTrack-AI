@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  HeartPulse,
   KeyRound,
   Lock,
   Phone,
@@ -120,8 +119,13 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
         {/* LOGO & TITLE */}
         <div className="text-center mb-6">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
-            <HeartPulse className="h-7 w-7" />
+          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl overflow-hidden shadow-md shadow-emerald-700/15 border border-slate-100 bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.jpg"
+              alt="SwasthTrack Logo"
+              className="h-full w-full object-cover"
+            />
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
             SwasthTrack
