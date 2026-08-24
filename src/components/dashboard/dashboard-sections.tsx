@@ -1,0 +1,481 @@
+"use client";
+
+import {
+  CheckCircle2,
+  Footprints,
+  HeartPulse,
+  Pill,
+  Plus,
+  Scale,
+  Utensils,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import {
+  logMedicineStatus,
+  toggleChecklistItem,
+  type DashboardOverview,
+} from "@/services/patient-service";
+
+type DashboardSectionsProps = {
+  data: DashboardOverview;
+  onRefresh: () => void;
+  onOpenBP: () => void;
+  onOpenWeight: () => void;
+  onOpenFood: () => void;
+  onOpenActivity: () => void;
+  onOpenMedicine: () => void;
+};
+
+export function DashboardSections({
+  data,
+  onRefresh,
+  onOpenBP,
+  onOpenWeight,
+  onOpenFood,
+  onOpenActivity,
+  onOpenMedicine,
+}: DashboardSectionsProps) {
+  const {
+    todayMorningBP,
+    todayEveningBP,
+    todayWeight,
+    todayActivity,
+    medicines,
+    todayMedicineTakenCount,
+    todayMedicineTotalCount,
+    todayFoodCalories,
+    todayProteinGrams,
+    checklist,
+    patient,
+  } = data;
+
+
+  const adherencePercent =
+    todayMedicineTotalCount > 0
+      ? Math.round((todayMedicineTakenCount / todayMedicineTotalCount) * 100)
+      : 0;
+
+  async function handleMarkMedicine(medicineId: string, status: "taken" | "late" | "missed") {
+    await logMedicineStatus({
+      medicine_id: medicineId,
+      patient_id: patient.id,
+      scheduled_time: new Date().toISOString(),
+      taken_time: status === "taken" || status === "late" ? new Date().toISOString() : null,
+      status,
+      notes: null,
+    });
+    onRefresh();
+  }
+
+  async function handleToggleChecklist(itemId: string, currentStatus: string) {
+    const isCompleted = currentStatus === "completed";
+    await toggleChecklistItem(itemId, !isCompleted);
+    onRefresh();
+  }
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-2">
+      {/* 1. TODAY'S MEALS */}
+      <Card>
+        <CardHeader>
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle>Today&apos;s Meals</CardTitle>
+              <Badge variant="green">आज का भोजन</Badge>
+            </div>
+            <CardDescription>
+              {todayFoodCalories !== null
+                ? `${todayFoodCalories} / ${patient.daily_calorie_target} kcal consumed`
+                : "No meals logged for today"}
+            </CardDescription>
+          </div>
+          <Button variant="secondary" onClick={onOpenFood} className="h-9 px-3 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            + Add Food
+          </Button>
+        </CardHeader>
+
+        {todayFoodCalories !== null ? (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-800">Total Calories:</span>
+                <span className="font-bold text-emerald-800">{todayFoodCalories} kcal</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-xs text-slate-600">
+                <span>Total Protein:</span>
+                <span className="font-semibold text-slate-800">{todayProteinGrams || 0} g</span>
+              </div>
+            </div>
+            <ProgressBar
+              label="Calorie limit progress"
+              max={patient.daily_calorie_target}
+              value={todayFoodCalories}
+            />
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+            <Utensils className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">
+              No data recorded today
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              आज कोई भोजन दर्ज नहीं किया गया है।
+            </p>
+            <Button variant="secondary" onClick={onOpenFood} className="mt-4 text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              Log Breakfast / Lunch / Snack
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* 2. MEDICINE ADHERENCE */}
+      <Card>
+        <CardHeader>
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle>Medicine Adherence</CardTitle>
+              <Badge variant="blue">दवाइयाँ</Badge>
+            </div>
+            <CardDescription>
+              {todayMedicineTotalCount > 0
+                ? `${todayMedicineTakenCount} of ${todayMedicineTotalCount} doses recorded today`
+                : "No active medicines in profile"}
+            </CardDescription>
+          </div>
+          <Button variant="secondary" onClick={onOpenMedicine} className="h-9 px-3 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            Manage
+          </Button>
+        </CardHeader>
+
+        {medicines.filter((m) => m.active).length > 0 ? (
+          <div>
+            <ProgressBar
+              label="Today's dose completion"
+              max={100}
+              value={adherencePercent}
+            />
+            <div className="mt-4 space-y-2.5">
+              {medicines
+                .filter((m) => m.active)
+                .map((medicine) => {
+                  const todayLogs = data.todayMedicineLogs || [];
+                  const logItem = todayLogs.find((l) => l.medicine_id === medicine.id);
+                  const currentStatus = logItem ? logItem.status : null;
+
+                  return (
+                    <div
+                      key={medicine.id}
+                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-slate-950">
+                            {medicine.medicine_name}
+                          </p>
+                          <span className="text-xs font-semibold text-emerald-700">
+                            {medicine.dose}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {medicine.scheduled_time.slice(0, 5)} · {medicine.meal_relation || "With water"}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 pt-1 sm:pt-0">
+                        <button
+                          type="button"
+                          onClick={() => handleMarkMedicine(medicine.id, "taken")}
+                          className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition-all ${
+                            currentStatus === "taken"
+                              ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                          }`}
+                        >
+                          ✓ Taken (लिया)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMarkMedicine(medicine.id, "late")}
+                          className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-all ${
+                            currentStatus === "late"
+                              ? "border-amber-500 bg-amber-500 text-white shadow-xs"
+                              : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                          }`}
+                        >
+                          Late
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMarkMedicine(medicine.id, "missed")}
+                          className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-all ${
+                            currentStatus === "missed"
+                              ? "border-rose-600 bg-rose-600 text-white shadow-xs"
+                              : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                          }`}
+                        >
+                          Missed
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+            <Pill className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">
+              No active medicines
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              कोई सक्रिय दवाई नहीं है।
+            </p>
+          </div>
+        )}
+      </Card>
+
+      {/* 3. BLOOD PRESSURE */}
+      <Card>
+        <CardHeader>
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle>Blood Pressure</CardTitle>
+              <Badge variant="red">रक्तचाप</Badge>
+            </div>
+            <CardDescription>
+              {todayMorningBP || todayEveningBP ? "Today's readings recorded" : "Awaiting today's reading"}
+            </CardDescription>
+          </div>
+          <Button variant="secondary" onClick={onOpenBP} className="h-9 px-3 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            + Log BP
+          </Button>
+        </CardHeader>
+
+        {todayMorningBP || todayEveningBP ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Morning BP */}
+            <div className={`rounded-xl border p-4 ${todayMorningBP ? "border-rose-100 bg-rose-50/40" : "border-dashed border-slate-200 bg-slate-50/70"}`}>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">सुबह · Morning</p>
+              {todayMorningBP ? (
+                <>
+                  <p className="text-2xl font-extrabold text-slate-950">
+                    {todayMorningBP.systolic}/{todayMorningBP.diastolic}
+                    <span className="text-xs font-semibold text-slate-400"> mmHg</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Pulse: {todayMorningBP.pulse ? `${todayMorningBP.pulse} bpm` : "--"}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1">दर्ज नहीं किया</p>
+              )}
+            </div>
+            {/* Evening BP */}
+            <div className={`rounded-xl border p-4 ${todayEveningBP ? "border-rose-100 bg-rose-50/40" : "border-dashed border-slate-200 bg-slate-50/70"}`}>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">शाम · Evening</p>
+              {todayEveningBP ? (
+                <>
+                  <p className="text-2xl font-extrabold text-slate-950">
+                    {todayEveningBP.systolic}/{todayEveningBP.diastolic}
+                    <span className="text-xs font-semibold text-slate-400"> mmHg</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Pulse: {todayEveningBP.pulse ? `${todayEveningBP.pulse} bpm` : "--"}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1">दर्ज नहीं किया</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+            <HeartPulse className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">
+              No data recorded today
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              आज का BP दर्ज नहीं किया गया है।
+            </p>
+            <Button variant="secondary" onClick={onOpenBP} className="mt-4 text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              Record Blood Pressure
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* 4. WEIGHT */}
+      <Card>
+        <CardHeader>
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle>Body Weight</CardTitle>
+              <Badge variant="amber">वजन</Badge>
+            </div>
+            <CardDescription>
+              {todayWeight ? "Weight recorded today" : "Awaiting today's weigh-in"}
+            </CardDescription>
+          </div>
+          <Button variant="secondary" onClick={onOpenWeight} className="h-9 px-3 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            + Log Weight
+          </Button>
+        </CardHeader>
+
+        {todayWeight ? (
+          <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-3xl font-extrabold text-slate-950">
+                  {todayWeight.weight_kg}
+                  <span className="text-sm font-semibold text-slate-500"> kg</span>
+                </p>
+                <p className="mt-1 text-xs font-medium text-slate-600">
+                  Target: {patient.target_weight_kg ? `${patient.target_weight_kg} kg` : "--"} · Goal difference:{" "}
+                  {patient.target_weight_kg
+                    ? `${(todayWeight.weight_kg - patient.target_weight_kg).toFixed(1)} kg`
+                    : "--"}
+                </p>
+                {todayWeight.notes ? (
+                  <p className="mt-2 text-xs italic text-slate-500">
+                    &quot;{todayWeight.notes}&quot;
+                  </p>
+                ) : null}
+              </div>
+              <Badge variant="amber">Today</Badge>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+            <Scale className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">
+              No data recorded today
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Profile weight: {patient.current_weight_kg ? `${patient.current_weight_kg} kg` : "--"}
+            </p>
+            <Button variant="secondary" onClick={onOpenWeight} className="mt-4 text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              Record Today&apos;s Weight
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* 5. PHYSICAL ACTIVITY */}
+      <Card>
+        <CardHeader>
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle>Physical Activity</CardTitle>
+              <Badge variant="green">शारीरिक गतिविधि</Badge>
+            </div>
+            <CardDescription>Daily steps, distance, and walking time</CardDescription>
+          </div>
+          <Button variant="secondary" onClick={onOpenActivity} className="h-9 px-3 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            + Log Activity
+          </Button>
+        </CardHeader>
+
+        {todayActivity && (todayActivity.steps > 0 || todayActivity.distance_km > 0) ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl bg-emerald-50 p-4">
+              <p className="text-xs font-semibold text-emerald-700">Steps Walked</p>
+              <p className="mt-1 text-2xl font-extrabold text-slate-950">
+                {todayActivity.steps.toLocaleString()}
+              </p>
+              <p className="text-[11px] text-slate-500">कदम</p>
+            </div>
+
+            <div className="rounded-xl bg-sky-50 p-4">
+              <p className="text-xs font-semibold text-sky-700">Distance</p>
+              <p className="mt-1 text-2xl font-extrabold text-slate-950">
+                {todayActivity.distance_km} km
+              </p>
+              <p className="text-[11px] text-slate-500">दूरी</p>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-slate-600">Active Time</p>
+              <p className="mt-1 text-2xl font-extrabold text-slate-950">
+                {todayActivity.walking_minutes || 0} min
+              </p>
+              <p className="text-[11px] text-slate-500">समय</p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+            <Footprints className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">
+              No data recorded today
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              आज की चाल या कदम दर्ज नहीं किए गए हैं।
+            </p>
+            <Button variant="secondary" onClick={onOpenActivity} className="mt-4 text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              Log Steps / Walk
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* 6. TODAY'S CHECKLIST */}
+      <Card className="xl:col-span-2">
+        <CardHeader>
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle>Today&apos;s Routine Checklist</CardTitle>
+              <Badge variant="green">दैनिक कार्य सूची</Badge>
+            </div>
+            <CardDescription>
+              Check off daily habits and routines as you complete them
+            </CardDescription>
+          </div>
+          <CheckCircle2 aria-hidden className="h-5 w-5 text-emerald-600" />
+        </CardHeader>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {checklist.map((item) => {
+            const isCompleted = item.status === "completed";
+
+            return (
+              <label
+                key={item.id}
+                className={`flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm font-medium transition-all ${
+                  isCompleted
+                    ? "border-emerald-200 bg-emerald-50/80 text-emerald-950 shadow-2xs"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isCompleted}
+                  onChange={() => handleToggleChecklist(item.id, item.status)}
+                  className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className={isCompleted ? "line-through text-slate-500" : ""}>
+                  {item.item_label}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}

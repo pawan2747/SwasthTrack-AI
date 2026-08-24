@@ -1,0 +1,34 @@
+food_name_en,portion_name,standard_quantity,unit,verification_note
+Wheat Roti,small,25,g flour-equivalent,Needs verified Indian roti standard
+Wheat Roti,standard,30,g flour-equivalent,Needs verified Indian roti standard
+Wheat Roti,large,40,g flour-equivalent,Needs verified Indian roti standard
+Moong Dal (cooked),1 katori,150,g cooked,Needs verified cooked recipe/standard
+Toor Dal (cooked),1 katori,150,g cooked,Needs verified cooked recipe/standard
+Chana Dal (cooked),1 katori,150,g cooked,Needs verified cooked recipe/standard
+Bhindi Sabzi (low oil),1 katori,150,g cooked,Oil must be logged separately
+Lauki Sabzi (low oil),1 katori,150,g cooked,Oil must be logged separately
+Mixed Vegetable (low oil),1 katori,150,g cooked,Oil must be logged separately
+Makhana (roasted),1 portion,20,g,Use raw/roasted reference consistently
+"Tea with Milk, No Added Sugar",1 cup,150,ml,Milk quantity must be standardized
+Plain Khichdi (low oil),1 katori,150,g cooked,Oil logged separately
+Chana Sattu,1 glass,30,g powder,Sattu standard drink recipe
+Aloo Bhujia,1 portion,30,g,Haldiram style standard serving
+Gatte ki Sabzi,1 katori,150,g,Besan gatte in gravy
+Poha,1 medium bowl,150,g,Cooked flattened rice
+Upma,1 medium bowl,150,g,Semolina cooked preparation
+Idli,1 piece,40,g,Rice urad steamed cake
+Sambar,1 katori,150,g,Lentil soup with veggies
+Coconut Chutney,2 tbsp,30,g,Coconut condiment paste
+Plain Dosa,1 standard,60,g,South Indian thin crepe
+Masala Dosa,1 standard,150,g,Rice crepe with potato filling
+Paneer Bhurji (low oil),1 katori,150,g,Low oil cottage cheese scramble
+Cucumber Raita,1 katori,150,g,Yogurt with cucumber salad
+Boondi Raita,1 katori,150,g,Yogurt with fried boondi
+Aloo ki Bhujia (dry sabzi),1 katori,150,g,Dry potato preparation
+Oats Khichdi,1 katori,200,g,Cooked oats with mixed vegetables
+Baingan Bharta,1 katori,150,g,Mashed roasted eggplant
+Palak Paneer (low oil),1 katori,150,g,Cottage cheese in spinach gravy
+Jeera Rice,1 katori,150,g,Cooked jeera cumin rice
+Plain Paratha,1 piece,50,g,Tawa fried flatbread
+Aloo Paratha,1 piece,100,g,Potato stuffed flatbread
+Puri,1 piece,30,g,Deep fried puffed flatbread
