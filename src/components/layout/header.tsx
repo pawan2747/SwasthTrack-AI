@@ -22,63 +22,63 @@ export function Header() {
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-emerald-950/10 bg-white/90 backdrop-blur-md">
-      {/* MOBILE HEADER (Slim & Compact: ~50px height) */}
-      <div className="flex h-13 items-center justify-between px-3.5 lg:hidden">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md">
+      {/* MOBILE HEADER (Clear & Readable: ~54px height) */}
+      <div className="flex h-14 items-center justify-between px-3.5 lg:hidden">
         {/* Left: Brand Logo + Patient Name */}
         <Link href="/" className="flex items-center gap-2.5 min-w-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.jpg"
             alt="SwasthTrack"
-            className="h-8 w-8 shrink-0 rounded-xl object-cover border border-emerald-900/10 shadow-xs"
+            className="h-9 w-9 shrink-0 rounded-xl object-cover border border-slate-200 shadow-2xs"
           />
           <div className="min-w-0">
-            <p className="text-xs font-black text-slate-900 truncate leading-tight">
+            <p className="text-sm font-black text-slate-950 truncate leading-tight">
               {profile?.name || "SwasthTrack"}
             </p>
-            <p className="text-[10px] font-semibold text-emerald-700 leading-none">
+            <p className="text-xs font-bold text-emerald-800 leading-none mt-0.5">
               {profile?.daily_calorie_target ? `${profile.daily_calorie_target} kcal` : "Active"}
             </p>
           </div>
         </Link>
 
         {/* Right: Quick Action Icons (Caregiver, Settings, Profile) */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/caregiver"
             title="Caregiver"
-            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition-colors ${
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/caregiver"
-                ? "border-emerald-600 bg-emerald-50 text-emerald-700"
-                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                ? "border-emerald-600 bg-emerald-100 text-emerald-900"
+                : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <UserCheck className="h-4 w-4" />
+            <UserCheck className="h-4.5 w-4.5" />
           </Link>
 
           <Link
             href="/settings"
             title="Settings"
-            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition-colors ${
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/settings"
-                ? "border-emerald-600 bg-emerald-50 text-emerald-700"
-                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                ? "border-emerald-600 bg-emerald-100 text-emerald-900"
+                : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-4.5 w-4.5" />
           </Link>
 
           <Link
             href="/profile"
             title="Profile"
-            className={`flex h-8 w-8 items-center justify-center rounded-xl border transition-colors ${
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/profile"
-                ? "border-emerald-600 bg-emerald-50 text-emerald-700"
-                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                ? "border-emerald-600 bg-emerald-100 text-emerald-900"
+                : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <UserCircle className="h-4 w-4" />
+            <UserCircle className="h-4.5 w-4.5" />
           </Link>
         </div>
       </div>

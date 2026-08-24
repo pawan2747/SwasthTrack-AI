@@ -176,30 +176,30 @@ export function DashboardSections({
                   return (
                     <div
                       key={medicine.id}
-                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-3 rounded-2xl border-2 border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-slate-950">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-black text-slate-950">
                             {medicine.medicine_name}
                           </p>
-                          <span className="text-xs font-semibold text-emerald-700">
+                          <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
                             {medicine.dose}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500">
-                          {medicine.scheduled_time.slice(0, 5)} · {medicine.meal_relation || "With water"}
+                        <p className="text-xs sm:text-sm font-bold text-slate-700">
+                          ⏰ {medicine.scheduled_time.slice(0, 5)} · {medicine.meal_relation ? medicine.meal_relation.replace("_", " ") : "With water"}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-1.5 pt-1 sm:pt-0">
+                      <div className="flex items-center gap-2 pt-1 sm:pt-0 shrink-0">
                         <button
                           type="button"
                           onClick={() => handleMarkMedicine(medicine.id, "taken")}
-                          className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition-all ${
+                          className={`min-h-10 rounded-xl border-2 px-3 py-1.5 text-xs sm:text-sm font-black transition-all ${
                             currentStatus === "taken"
                               ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                              : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
                           }`}
                         >
                           ✓ Taken (लिया)
@@ -207,24 +207,24 @@ export function DashboardSections({
                         <button
                           type="button"
                           onClick={() => handleMarkMedicine(medicine.id, "late")}
-                          className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-all ${
+                          className={`min-h-10 rounded-xl border-2 px-3 py-1.5 text-xs sm:text-sm font-black transition-all ${
                             currentStatus === "late"
                               ? "border-amber-500 bg-amber-500 text-white shadow-xs"
-                              : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                              : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
                           }`}
                         >
-                          Late
+                          ⏳ Late
                         </button>
                         <button
                           type="button"
                           onClick={() => handleMarkMedicine(medicine.id, "missed")}
-                          className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-all ${
+                          className={`min-h-10 rounded-xl border-2 px-3 py-1.5 text-xs sm:text-sm font-black transition-all ${
                             currentStatus === "missed"
                               ? "border-rose-600 bg-rose-600 text-white shadow-xs"
-                              : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                              : "border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100"
                           }`}
                         >
-                          Missed
+                          ✗ Missed
                         </button>
                       </div>
                     </div>
