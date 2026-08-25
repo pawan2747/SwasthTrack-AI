@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { SkeletonDashboard } from "@/components/ui/skeleton-loaders";
 import { DashboardSections } from "@/components/dashboard/dashboard-sections";
 import { PatientOverviewCard } from "@/components/dashboard/patient-overview-card";
+import { PapaGreetingBanner } from "@/components/dashboard/papa-greeting-banner";
 import { QuickActionsBar } from "@/components/dashboard/quick-actions-bar";
 import { TodaySummaryGrid } from "@/components/dashboard/today-summary-grid";
 import { WellnessScoreCard } from "@/components/dashboard/wellness-score-card";
@@ -151,6 +152,9 @@ export default function DashboardPage() {
           {toastMessage}
         </div>
       ) : null}
+
+      {/* WARM PERSONAL LOVE GREETING FOR PAPA */}
+      <PapaGreetingBanner patient={data.patient} />
 
       {/* PATIENT OVERVIEW BANNER */}
       <PatientOverviewCard
