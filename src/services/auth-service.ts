@@ -205,7 +205,23 @@ export async function loginWithPhonePassword(
     "patient",
   );
 
-  const isNewUser = !hasActivePatientMembership(profile.id);
+  // Auto-link to existing patient in Supabase if one exists
+  if (isSupabaseConfigured) {
+    try {
+      const { data: pts } = await supabase.from("patients").select("id").limit(1);
+      if (pts && pts.length > 0) {
+        const existingPatientId = pts[0].id;
+        await ensurePatientMembership(existingPatientId, profile.id, "patient");
+        await ensurePatientMembership(existingPatientId, authUser.id, "patient");
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  const isNewUser =
+    !hasActivePatientMembership(profile.id) &&
+    !hasActivePatientMembership(authUser.id);
 
   setStorageItem(AUTH_USER_KEY, authUser);
   setStorageItem(AUTH_PROFILE_KEY, profile);

@@ -246,7 +246,51 @@ export async function getPatientProfile(patientId?: string): Promise<PatientProf
     }
   }
 
-  // 2. Fallback to fresh clean default patient with no prefilled names
+  // 2. Fallback: Query active patient from Supabase if available
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from("patients")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data) {
+        _profileCache = data;
+        _profileCacheTime = Date.now();
+
+        // Ensure active membership is recorded locally
+        if (typeof window !== "undefined") {
+          const userProfile = getStorageItem<{ id: string } | null>("swasthtrack_auth_profile", null);
+          const authUser = getStorageItem<{ id: string } | null>("swasthtrack_auth_user", null);
+          const uid = userProfile?.id || authUser?.id;
+          if (uid) {
+            const memberships = getStorageItem<any[]>("swasthtrack_patient_memberships", []);
+            if (!memberships.some((m) => m.patient_id === data.id && m.user_id === uid)) {
+              setStorageItem("swasthtrack_patient_memberships", [
+                ...memberships,
+                {
+                  id: `mem-${Date.now()}`,
+                  patient_id: data.id,
+                  user_id: uid,
+                  role: "patient",
+                  status: "active",
+                  created_at: new Date().toISOString(),
+                },
+              ]);
+            }
+          }
+        }
+
+        return data;
+      }
+    } catch (err) {
+      console.warn("Supabase fallback fetch patient failed:", err);
+    }
+  }
+
+  // 3. Fallback to fresh clean default patient with no prefilled names
   const cleanDefault: PatientProfile = {
     ...DEFAULT_PATIENT,
     id: `patient-${Date.now()}`,
