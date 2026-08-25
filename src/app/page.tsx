@@ -159,6 +159,16 @@ export default function DashboardPage() {
         onEditProfile={() => setIsEditProfileOpen(true)}
       />
 
+      {/* PROMINENT TOP 1-TAP DAILY TRACKER FOR PAPA */}
+      <QuickActionsBar
+        onOpenBP={() => setIsBPOpen(true)}
+        onOpenWeight={() => setIsWeightOpen(true)}
+        onOpenFood={() => setIsFoodOpen(true)}
+        onOpenActivity={() => setIsActivityOpen(true)}
+        onOpenSleep={() => setIsSleepOpen(true)}
+        onOpenMedicine={() => setIsMedicineOpen(true)}
+      />
+
       {/* TODAY'S WELLNESS & TRACKING SCORE */}
       <WellnessScoreCard
         patientId={data.patient.id}
@@ -195,16 +205,6 @@ export default function DashboardPage() {
           onOpenDiagnostics={isAdmin ? () => setIsDiagnosticsOpen(true) : undefined}
         />
       )}
-
-      {/* QUICK ACTIONS BAR */}
-      <QuickActionsBar
-        onOpenBP={() => setIsBPOpen(true)}
-        onOpenWeight={() => setIsWeightOpen(true)}
-        onOpenFood={() => setIsFoodOpen(true)}
-        onOpenActivity={() => setIsActivityOpen(true)}
-        onOpenSleep={() => setIsSleepOpen(true)}
-        onOpenMedicine={() => setIsMedicineOpen(true)}
-      />
 
       {/* TODAY'S METRIC SUMMARY */}
       <TodaySummaryGrid data={data} />

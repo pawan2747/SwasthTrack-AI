@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Moon } from "lucide-react";
+import { Moon, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, TextInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
@@ -14,6 +14,21 @@ type AddSleepDialogProps = {
   onSuccess?: () => void;
 };
 
+const SLEEP_PRESETS = [
+  { label: "6 घंटे", hours: "6.0", hint: "6 hrs" },
+  { label: "6.5 घंटे", hours: "6.5", hint: "6.5 hrs" },
+  { label: "7 घंटे", hours: "7.0", hint: "7 hrs (उत्तम)" },
+  { label: "7.5 घंटे", hours: "7.5", hint: "7.5 hrs" },
+  { label: "8 घंटे", hours: "8.0", hint: "8 hrs (पूरी नींद)" },
+  { label: "8.5 घंटे", hours: "8.5", hint: "8.5 hrs" },
+];
+
+const SLEEP_QUALITIES = [
+  { label: "😊 गहरी व अच्छी नींद", value: "गहरी व अच्छी नींद (Good Sleep)" },
+  { label: "😐 सामान्य नींद", value: "सामान्य नींद (Normal Sleep)" },
+  { label: "🥱 कम नींद / बेचैनी", value: "कम नींद / बेचैनी (Restless / Low Sleep)" },
+];
+
 export function AddSleepDialog({
   isOpen,
   onClose,
@@ -22,9 +37,7 @@ export function AddSleepDialog({
 }: AddSleepDialogProps) {
   const [date, setDate] = useState(getTodayDateString());
   const [sleepHours, setSleepHours] = useState("7.5");
-  const [bedtime, setBedtime] = useState("22:30");
-  const [wakeTime, setWakeTime] = useState("06:00");
-  const [notes, setNotes] = useState("");
+  const [selectedQuality, setSelectedQuality] = useState("गहरी व अच्छी नींद (Good Sleep)");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,7 +47,7 @@ export function AddSleepDialog({
 
     const hours = parseFloat(sleepHours);
     if (isNaN(hours) || hours <= 0 || hours > 24) {
-      setError("Please enter valid sleep hours between 0 and 24 (नींद के घंटे 0 से 24 के बीच होने चाहिए)");
+      setError("कृपया सही नींद के घंटे दर्ज करें (0 से 24 के बीच)");
       return;
     }
 
@@ -44,15 +57,15 @@ export function AddSleepDialog({
         patient_id: patientId,
         date,
         sleep_hours: hours,
-        bedtime: bedtime || null,
-        wake_time: wakeTime || null,
-        notes: notes.trim() || null,
+        bedtime: "22:30",
+        wake_time: "06:00",
+        notes: selectedQuality || null,
       });
 
       onClose();
       onSuccess?.();
     } catch {
-      setError("Failed to record sleep log. Please try again.");
+      setError("नींद का रिकॉर्ड सेव करने में समस्या आई। कृपया पुनः प्रयास करें।");
     } finally {
       setLoading(false);
     }
@@ -63,73 +76,93 @@ export function AddSleepDialog({
       isOpen={isOpen}
       onClose={onClose}
       title="Record Sleep"
-      hindiTitle="नींद दर्ज करें"
-      description="Track your last night's sleep duration and bedtime schedule."
+      hindiTitle="नींद का समय दर्ज करें"
+      description="कल रात कितने घंटे सोए? आसानी से 1-क्लिक में चुनें।"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-700">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
             {error}
           </div>
         ) : null}
 
-        <Field label="Date (दिनांक)">
-          <TextInput
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
-        </Field>
+        {/* 1. 1-TAP PRESET SLEEP HOURS (Papa Friendly) */}
+        <div>
+          <label className="block text-sm font-black text-slate-900 mb-2">
+            ⭐ कितने घंटे सोए? (1-टैप में चुनें):
+          </label>
+          <div className="grid grid-cols-3 gap-2.5">
+            {SLEEP_PRESETS.map((preset) => {
+              const isSelected = sleepHours === preset.hours;
+              return (
+                <button
+                  type="button"
+                  key={preset.hours}
+                  onClick={() => setSleepHours(preset.hours)}
+                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all text-center ${
+                    isSelected
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-950 font-black ring-2 ring-indigo-500/30 shadow-xs scale-102"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50 font-bold"
+                  }`}
+                >
+                  <span className="text-base sm:text-lg">{preset.label}</span>
+                  <span className="text-[11px] font-semibold text-slate-500">{preset.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-        <Field label="Total Sleep Duration (कुल नींद - घंटे)" hint="e.g. 7.5 hours">
-          <TextInput
-            autoFocus
-            type="number"
-            step="0.25"
-            inputMode="decimal"
-            placeholder="e.g. 7.5"
-            value={sleepHours}
-            onChange={(e) => setSleepHours(e.target.value)}
-            className="text-lg font-semibold"
-            required
-          />
-        </Field>
+        {/* 2. SLEEP QUALITY SELECTOR */}
+        <div>
+          <label className="block text-sm font-black text-slate-900 mb-2">
+            ⭐ नींद कैसी रही? (Sleep Quality):
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {SLEEP_QUALITIES.map((q) => {
+              const isSelected = selectedQuality === q.value;
+              return (
+                <button
+                  type="button"
+                  key={q.value}
+                  onClick={() => setSelectedQuality(q.value)}
+                  className={`p-2.5 rounded-xl border-2 text-xs sm:text-sm font-bold text-left transition-all flex items-center justify-between ${
+                    isSelected
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-black shadow-2xs"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span>{q.label}</span>
+                  {isSelected && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Bedtime (सोने का समय)">
+        {/* 3. DATE SELECTOR */}
+        <div className="pt-1">
+          <Field label="दिनांक (Date)">
             <TextInput
-              type="time"
-              value={bedtime}
-              onChange={(e) => setBedtime(e.target.value)}
-            />
-          </Field>
-
-          <Field label="Wake-up Time (जागने का समय)">
-            <TextInput
-              type="time"
-              value={wakeTime}
-              onChange={(e) => setWakeTime(e.target.value)}
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="text-base font-bold"
+              required
             />
           </Field>
         </div>
 
-        <Field label="Notes (टिप्पणी / नींद की गुणवत्ता)">
-          <TextInput
-            type="text"
-            placeholder="e.g. Slept peacefully, woke up refreshed"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Field>
-
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
-            Cancel (रद्द करें)
-          </Button>
-          <Button variant="primary" type="submit" disabled={loading}>
-            <Moon className="h-4 w-4" />
-            {loading ? "Saving..." : "Save Sleep Log (सुरक्षित करें)"}
+        {/* SUBMIT BUTTON */}
+        <div className="pt-2">
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={loading}
+            className="w-full min-h-12 text-base font-black rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20"
+          >
+            <Moon className="h-5 w-5 mr-2" />
+            {loading ? "सेव हो रहा है..." : `🌙 ${sleepHours} घंटे नींद सेव करें (Save Sleep)`}
           </Button>
         </div>
       </form>

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Footprints } from "lucide-react";
+import { Footprints, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field, TextInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
 import { getTodayDateString, logActivity } from "@/services/patient-service";
 
@@ -16,56 +15,51 @@ type AddActivityDialogProps = {
   onSuccess?: () => void;
 };
 
+const ACTIVITY_PRESETS = [
+  { label: "🚶 15 मिनट टहलना", steps: 1500, km: 1.0, min: 15, cal: 60, tag: "हल्की वॉक" },
+  { label: "🚶 30 मिनट टहलना", steps: 3000, km: 2.1, min: 30, cal: 120, tag: "उत्तम वॉक" },
+  { label: "🚶 45 मिनट टहलना", steps: 4500, km: 3.2, min: 45, cal: 180, tag: "लंबी वॉक" },
+  { label: "🚶 60 मिनट टहलना", steps: 6000, km: 4.2, min: 60, cal: 240, tag: "दैनिक लक्ष्य पूरा" },
+];
+
 export function AddActivityDialog({
   isOpen,
   onClose,
   patientId,
-  initialSteps = 0,
-  initialDistanceKm = 0,
+  initialSteps = 3000,
+  initialDistanceKm = 2.1,
   onSuccess,
 }: AddActivityDialogProps) {
-  const [date, setDate] = useState(getTodayDateString());
-  const [steps, setSteps] = useState(initialSteps ? String(initialSteps) : "");
-  const [distanceKm, setDistanceKm] = useState(initialDistanceKm ? String(initialDistanceKm) : "");
-  const [walkingMinutes, setWalkingMinutes] = useState("");
-  const [caloriesBurned, setCaloriesBurned] = useState("");
+  const [date] = useState(getTodayDateString());
+  const [steps, setSteps] = useState(String(initialSteps || 3000));
+  const [distanceKm, setDistanceKm] = useState(String(initialDistanceKm || 2.1));
+  const [walkingMinutes, setWalkingMinutes] = useState("30");
+  const [caloriesBurned, setCaloriesBurned] = useState("120");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  function handleSelectPreset(p: typeof ACTIVITY_PRESETS[0]) {
+    setSteps(String(p.steps));
+    setDistanceKm(String(p.km));
+    setWalkingMinutes(String(p.min));
+    setCaloriesBurned(String(p.cal));
+    setError("");
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
 
-    const stepsNum = steps ? parseInt(steps, 10) : 0;
-    const distNum = distanceKm ? parseFloat(distanceKm) : 0;
-    const walkMinNum = walkingMinutes ? parseInt(walkingMinutes, 10) : 0;
-    const calNum = caloriesBurned ? parseFloat(caloriesBurned) : 0;
-
-    if (isNaN(stepsNum) || stepsNum < 0) {
-      setError("Steps cannot be negative (कदम ऋणात्मक नहीं हो सकते)");
-      return;
-    }
-
-    if (isNaN(distNum) || distNum < 0) {
-      setError("Distance cannot be negative (दूरी ऋणात्मक नहीं हो सकती)");
-      return;
-    }
-
-    if (isNaN(walkMinNum) || walkMinNum < 0) {
-      setError("Walking minutes cannot be negative (टहलने का समय सही दर्ज करें)");
-      return;
-    }
-
-    if (isNaN(calNum) || calNum < 0) {
-      setError("Calories burned cannot be negative (कैलोरी मान सही दर्ज करें)");
-      return;
-    }
+    const stepsNum = parseInt(steps, 10) || 0;
+    const distNum = parseFloat(distanceKm) || 0;
+    const walkMinNum = parseInt(walkingMinutes, 10) || 0;
+    const calNum = parseFloat(caloriesBurned) || 0;
 
     try {
       setLoading(true);
       await logActivity({
         patient_id: patientId,
-        date: date,
+        date,
         steps: stepsNum,
         distance_km: distNum,
         walking_minutes: walkMinNum,
@@ -75,7 +69,7 @@ export function AddActivityDialog({
       onClose();
       onSuccess?.();
     } catch {
-      setError("Failed to record activity. Please try again.");
+      setError("कदम / गतिविधि सेव करने में समस्या आई। पुनः प्रयास करें।");
     } finally {
       setLoading(false);
     }
@@ -86,79 +80,74 @@ export function AddActivityDialog({
       isOpen={isOpen}
       onClose={onClose}
       title="Record Physical Activity"
-      hindiTitle="शारीरिक गतिविधि दर्ज करें"
-      description="Record your daily steps, walking duration, or estimated distance."
+      hindiTitle="कदम / टहलना दर्ज करें"
+      description="आज कितनी देर टहले? 1-टैप में चुनें और सेव करें।"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-700">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
             {error}
           </div>
         ) : null}
 
-        <Field label="Date (दिनांक)">
-          <TextInput
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Steps Walked (कदम)" hint="e.g. 4500">
-            <TextInput
-              autoFocus
-              type="number"
-              inputMode="numeric"
-              placeholder="e.g. 4500"
-              value={steps}
-              onChange={(e) => setSteps(e.target.value)}
-              className="text-lg font-semibold"
-            />
-          </Field>
-
-          <Field label="Distance (दूरी km)" hint="e.g. 3.2 km">
-            <TextInput
-              type="number"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="e.g. 3.2"
-              value={distanceKm}
-              onChange={(e) => setDistanceKm(e.target.value)}
-            />
-          </Field>
+        {/* 1. 1-TAP WALKING PRESETS */}
+        <div>
+          <label className="block text-sm font-black text-slate-900 mb-2">
+            ⭐ आज कितनी देर टहले? (1-क्लिक में चुनें):
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {ACTIVITY_PRESETS.map((p) => {
+              const isSelected = walkingMinutes === String(p.min);
+              return (
+                <button
+                  type="button"
+                  key={p.min}
+                  onClick={() => handleSelectPreset(p)}
+                  className={`p-3 rounded-2xl border-2 text-left transition-all flex items-center justify-between ${
+                    isSelected
+                      ? "border-sky-600 bg-sky-50 text-sky-950 font-black ring-2 ring-sky-500/30 shadow-xs"
+                      : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50 font-bold"
+                  }`}
+                >
+                  <div>
+                    <p className="text-base font-black leading-tight">{p.label}</p>
+                    <p className="text-xs font-bold text-sky-800 mt-0.5">
+                      ~{p.steps} कदम · {p.km} km ({p.tag})
+                    </p>
+                  </div>
+                  {isSelected && <CheckCircle2 className="h-5 w-5 text-sky-600 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Walking Time (टहलने का समय)" hint="Minutes / मिनट">
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              placeholder="e.g. 35"
-              value={walkingMinutes}
-              onChange={(e) => setWalkingMinutes(e.target.value)}
-            />
-          </Field>
-
-          <Field label="Calories Burned (खर्च कैलोरी)" hint="Optional kcal">
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              placeholder="e.g. 180"
-              value={caloriesBurned}
-              onChange={(e) => setCaloriesBurned(e.target.value)}
-            />
-          </Field>
+        {/* 2. CHOSEN STATS SUMMARY */}
+        <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase">कुल कदम (Steps)</p>
+            <p className="text-xl font-black text-sky-900">{steps}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase">दूरी (Distance)</p>
+            <p className="text-xl font-black text-sky-900">{distanceKm} km</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-slate-500 uppercase">समय (Minutes)</p>
+            <p className="text-xl font-black text-sky-900">{walkingMinutes} min</p>
+          </div>
         </div>
 
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
-            Cancel (रद्द करें)
-          </Button>
-          <Button variant="primary" type="submit" disabled={loading}>
-            <Footprints className="h-4 w-4" />
-            {loading ? "Saving..." : "Save Activity (गतिविधि सुरक्षित करें)"}
+        {/* SUBMIT BUTTON */}
+        <div className="pt-1">
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={loading}
+            className="w-full min-h-12 text-base font-black rounded-2xl bg-sky-600 hover:bg-sky-700 text-white shadow-md shadow-sky-600/20"
+          >
+            <Footprints className="h-5 w-5 mr-2" />
+            {loading ? "सेव हो रहा है..." : `🚶 ${walkingMinutes} मिनट (${steps} कदम) सेव करें`}
           </Button>
         </div>
       </form>

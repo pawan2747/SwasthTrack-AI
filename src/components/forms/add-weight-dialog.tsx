@@ -3,7 +3,6 @@
 import { useState, type FormEvent } from "react";
 import { Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Field, TextInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
 import { logWeight } from "@/services/patient-service";
 
@@ -19,22 +18,26 @@ export function AddWeightDialog({
   isOpen,
   onClose,
   patientId,
-  currentWeight,
+  currentWeight = 75,
   onSuccess,
 }: AddWeightDialogProps) {
-  const [weight, setWeight] = useState(currentWeight ? String(currentWeight) : "");
-  const [notes, setNotes] = useState("");
+  const [weight, setWeight] = useState(currentWeight ? String(currentWeight) : "75.0");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  function adjustWeight(delta: number) {
+    const val = parseFloat(weight) || (currentWeight || 75.0);
+    const newVal = Math.round((val + delta) * 10) / 10;
+    setWeight(String(Math.max(30, Math.min(250, newVal))));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
 
     const weightNum = parseFloat(weight);
-
     if (isNaN(weightNum) || weightNum <= 20 || weightNum > 350) {
-      setError("Please enter a realistic weight between 20 and 350 kg (सही वजन दर्ज करें)");
+      setError("कृपया सही वजन दर्ज करें (20 से 350 kg)");
       return;
     }
 
@@ -44,14 +47,13 @@ export function AddWeightDialog({
         patient_id: patientId,
         weight_kg: weightNum,
         measured_at: new Date().toISOString(),
-        notes: notes.trim() || null,
+        notes: "Recorded via 1-tap quick dialog",
       });
 
-      setNotes("");
       onClose();
       onSuccess?.();
     } catch {
-      setError("Failed to record weight. Please try again.");
+      setError("वजन सेव करने में समस्या आई। कृपया पुनः प्रयास करें।");
     } finally {
       setLoading(false);
     }
@@ -63,50 +65,67 @@ export function AddWeightDialog({
       onClose={onClose}
       title="Record Weight"
       hindiTitle="वजन दर्ज करें"
-      description="Record your morning or evening body weight in kilograms."
+      description="वजन मशीन पर मापें और + / - बटन से आसानी से सेट करें।"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-700">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
             {error}
           </div>
         ) : null}
 
-        <Field label="Weight (वजन kg में)" hint="e.g. 78.4">
-          <div className="relative">
-            <TextInput
-              autoFocus
-              type="number"
-              step="0.1"
-              inputMode="decimal"
-              placeholder="e.g. 78.4"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="pr-12 text-lg font-semibold"
-              required
-            />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">
-              kg
-            </span>
+        {/* 1. BIG NUMBER STEPPER */}
+        <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-5 text-center">
+          <p className="text-xs font-black text-amber-900 uppercase tracking-wider">
+            आज का वजन (Body Weight)
+          </p>
+          <div className="my-3 flex items-baseline justify-center gap-1.5">
+            <span className="text-5xl font-black text-amber-950 tracking-tight">{weight}</span>
+            <span className="text-xl font-bold text-amber-700">kg</span>
           </div>
-        </Field>
 
-        <Field label="Notes (टिप्पणी)" hint="Optional (e.g. taken fasting in morning)">
-          <TextInput
-            type="text"
-            placeholder="e.g. Before breakfast, barefoot"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Field>
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <button
+              type="button"
+              onClick={() => adjustWeight(-0.5)}
+              className="min-h-12 min-w-20 rounded-2xl bg-white border-2 border-amber-300 font-black text-base text-amber-900 hover:bg-amber-100 flex items-center justify-center active:scale-95 shadow-xs"
+            >
+              - 0.5 kg
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustWeight(-0.1)}
+              className="min-h-12 min-w-16 rounded-2xl bg-white border-2 border-amber-200 font-bold text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-center active:scale-95"
+            >
+              - 0.1
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustWeight(+0.1)}
+              className="min-h-12 min-w-16 rounded-2xl bg-white border-2 border-amber-200 font-bold text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-center active:scale-95"
+            >
+              + 0.1
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustWeight(+0.5)}
+              className="min-h-12 min-w-20 rounded-2xl bg-white border-2 border-amber-300 font-black text-base text-amber-900 hover:bg-amber-100 flex items-center justify-center active:scale-95 shadow-xs"
+            >
+              + 0.5 kg
+            </button>
+          </div>
+        </div>
 
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
-            Cancel (रद्द करें)
-          </Button>
-          <Button variant="primary" type="submit" disabled={loading}>
-            <Scale className="h-4 w-4" />
-            {loading ? "Saving..." : "Save Weight (वजन सुरक्षित करें)"}
+        {/* SUBMIT BUTTON */}
+        <div className="pt-1">
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={loading}
+            className="w-full min-h-12 text-base font-black rounded-2xl bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-600/20"
+          >
+            <Scale className="h-5 w-5 mr-2" />
+            {loading ? "सेव हो रहा है..." : `⚖️ ${weight} kg वजन सेव करें (Save Weight)`}
           </Button>
         </div>
       </form>
