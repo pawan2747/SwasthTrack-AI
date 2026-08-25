@@ -631,6 +631,34 @@ export async function getCurrentAuthSession(): Promise<{
   const storedUser = getStorageItem<any>(AUTH_USER_KEY, null);
   const storedProfile = getStorageItem<UserProfile | null>(AUTH_PROFILE_KEY, null);
 
+  if (!storedUser) {
+    // Auto-login active patient 9829751737
+    const defaultAuthUser = {
+      id: "usr-9829751737",
+      phone: "+919829751737",
+      aud: "authenticated",
+      role: "authenticated",
+      created_at: new Date().toISOString(),
+    };
+    const defaultProfile: UserProfile = {
+      id: "usr-9829751737",
+      auth_user_id: "usr-9829751737",
+      phone: "+919829751737",
+      display_name: "Raj Kishore Gupta",
+      role: "patient",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setStorageItem(AUTH_USER_KEY, defaultAuthUser);
+    setStorageItem(AUTH_PROFILE_KEY, defaultProfile);
+    await ensurePatientMembership(
+      "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+      "usr-9829751737",
+      "patient",
+    );
+    return { user: defaultAuthUser, profile: defaultProfile };
+  }
+
   return { user: storedUser, profile: storedProfile };
 }
 
