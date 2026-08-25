@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import {
   AlertCircle,
   Bell,
@@ -751,15 +752,35 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* SECTION 9: ABOUT & PRIVACY */}
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 space-y-1.5">
-          <div className="flex items-center gap-1.5 font-bold text-slate-800">
-            <ShieldCheck className="h-4 w-4 text-emerald-700" />
-            <span>SwasthTrack Health Companion · Version 7.0 (Production Auth)</span>
+        {/* SECTION 9: ABOUT, CONTACT & LEGAL POLICIES */}
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-xs text-slate-600 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800">
+              <ShieldCheck className="h-4 w-4 text-emerald-700" />
+              <span>SwasthTrack Health Companion · Version 7.0</span>
+            </div>
+            <span className="text-[11px] text-slate-400">Created by Pawan Kumar</span>
           </div>
-          <p>
-            Your health records are privately synchronized with Supabase and protected with Row-Level Security (RLS). All score and insight algorithms are strictly rule-based for consistent tracking support.
+          <p className="text-slate-500 leading-relaxed">
+            Your health records are privately synchronized with Supabase and protected with Row-Level Security (RLS). All analytics are rule-based for supportive tracking.
           </p>
+          <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center gap-x-4 gap-y-2 font-bold text-emerald-800">
+            <Link href="/about" className="hover:underline">
+              About SwasthTrack
+            </Link>
+            <Link href="/contact" className="hover:underline">
+              Contact &amp; Support
+            </Link>
+            <Link href="/privacy" className="hover:underline">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:underline">
+              Terms of Use
+            </Link>
+            <Link href="/medical-disclaimer" className="hover:underline">
+              Medical Disclaimer
+            </Link>
+          </div>
         </div>
 
         {/* SUBMIT BUTTON */}

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { BottomNavigation } from "@/components/layout/bottom-navigation";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
+import { Footer } from "@/components/layout/footer";
 import { AuthProvider } from "@/context/auth-context";
 import { AuthGuard } from "@/components/layout/auth-guard";
 
@@ -17,13 +18,16 @@ function AppShellContent({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Sidebar />
-      <div className="min-h-screen lg:pl-72">
-        <Header />
-        <main className="mx-auto w-full max-w-7xl px-3.5 sm:px-6 lg:px-8 pt-3 sm:pt-6 pb-24 sm:pb-28 lg:pb-12">
-          {children}
-        </main>
+      <div className="min-h-screen lg:pl-72 flex flex-col justify-between">
+        <div>
+          <Header />
+          <main className="mx-auto w-full max-w-7xl px-3.5 sm:px-6 lg:px-8 pt-3 sm:pt-6 pb-24 sm:pb-28 lg:pb-12">
+            {children}
+          </main>
+        </div>
+        <Footer />
       </div>
       <BottomNavigation />
     </div>
