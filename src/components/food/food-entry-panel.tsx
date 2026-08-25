@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
-  BookOpen,
   Check,
   Plus,
   Search,
@@ -11,7 +10,8 @@ import {
   History,
   Star,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,30 +27,18 @@ import {
   type FoodItem,
   type FoodPortion
 } from "@/services/patient-service";
+import {
+  getPersonalizedQuickFoods,
+  recordQuickAddUsage,
+  hideQuickFood,
+  type PersonalizedQuickFoodItem,
+} from "@/services/quick-food-service";
 import { getExactFoodEmoji } from "@/lib/utils";
 
 type FoodEntryPanelProps = {
   patientId: string;
   onSuccess?: () => void;
 };
-
-// Raw patient-specific quick foods list
-const QUICK_FOODS_DATA = [
-  { name: "Apple", name_hi: "सेब", category: "fruit", defaultCal: 52 },
-  { name: "Almonds", name_hi: "बादाम", category: "nuts", defaultCal: 575 },
-  { name: "Wheat Roti", name_hi: "गेहूं की रोटी", category: "indian_preparation", defaultCal: 300 },
-  { name: "Moong Dal (cooked)", name_hi: "मूंग दाल", category: "indian_preparation", defaultCal: 100 },
-  { name: "Mung Beans", name_hi: "मूंग", category: "legume", defaultCal: 347 },
-  { name: "Chickpeas", name_hi: "काबुली चना", category: "legume", defaultCal: 364 },
-  { name: "Plain Yogurt", name_hi: "सादा दही", category: "dairy", defaultCal: 61 },
-  { name: "Tea with Milk, No Added Sugar", name_hi: "बिना चीनी की चाय", category: "beverage", defaultCal: 25 },
-  { name: "Makhana (roasted)", name_hi: "भुना मखाना", category: "snack", defaultCal: 350 },
-  { name: "Bhindi Sabzi (low oil)", name_hi: "भिंडी की सब्जी", category: "indian_preparation", defaultCal: 65 },
-  { name: "Lauki Sabzi (low oil)", name_hi: "लौकी की सब्जी", category: "indian_preparation", defaultCal: 45 },
-  { name: "Cucumber", name_hi: "खीरा", category: "salad_vegetable", defaultCal: 16 },
-  { name: "Tomato", name_hi: "टमाटर", category: "salad_vegetable", defaultCal: 18 },
-  { name: "Carrot", name_hi: "गाजर", category: "salad_vegetable", defaultCal: 41 }
-];
 
 // Returns the appropriate meal slot based on current local time
 function getMealTypeByTime(): string {
@@ -72,6 +60,11 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
   const [correctedQuery, setCorrectedQuery] = useState<string | undefined>(undefined);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   
+  // Dynamic Learned Quick Foods State
+  const [quickFoods, setQuickFoods] = useState<PersonalizedQuickFoodItem[]>([]);
+  const [quickFoodsLoading, setQuickFoodsLoading] = useState(true);
+  const quickActionLockRef = useRef(false);
+
   // Portions & Calculations
   const [portionOptions, setPortionOptions] = useState<FoodPortion[]>([]);
   const [selectedPortion, setSelectedPortion] = useState<FoodPortion | null>(null);
@@ -108,8 +101,21 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
     getFavorites(patientId).then(setFavorites);
   }, [patientId]);
 
+  const loadPersonalizedQuickFoods = useCallback(() => {
+    getPersonalizedQuickFoods(patientId, mealType, 8)
+      .then((items) => {
+        setQuickFoods(items);
+        setQuickFoodsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error loading personalized quick foods:", err);
+        setQuickFoodsLoading(false);
+      });
+  }, [patientId, mealType]);
+
   useEffect(() => {
     fetchFavorites();
+    loadPersonalizedQuickFoods();
     // Load search history from localStorage
     if (typeof window !== "undefined") {
       try {
@@ -121,7 +127,7 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
         }
       } catch {}
     }
-  }, [fetchFavorites]);
+  }, [fetchFavorites, loadPersonalizedQuickFoods]);
 
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -269,6 +275,7 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
       setSuccessMsg("भोजन सफलतापूर्वक दर्ज कर लिया गया है! (Saved!)");
       setSelectedFood(null);
       setSearchQuery("");
+      loadPersonalizedQuickFoods();
       onSuccess?.();
       setTimeout(() => setSuccessMsg(""), 3500);
     } catch (err) {
@@ -563,63 +570,107 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
               </div>
             )}
 
-            {/* 3. PROMINENT QUICK FOODS SECTION */}
+            {/* 3. PROMINENT PERSONALIZED QUICK FOODS SECTION */}
             <div>
-              <div className="flex items-center gap-1 text-sm font-semibold text-slate-700 mb-2.5">
-                <BookOpen className="h-4 w-4 text-emerald-600" />
-                <span>बार-बार खाए जाने वाले भोजन (Quick Food Shortcuts)</span>
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                  <Sparkles className="h-4 w-4 text-emerald-600" />
+                  <span>आपके नियमित भोजन · Quick Food Shortcuts</span>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {mealType ? `(${mealType} Relevance)` : "(Learned)"}
+                </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {QUICK_FOODS_DATA.map((q, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={async () => {
-                      // Fetch full food item details
-                      const { exactMatches } = await searchFoodItems(q.name);
-                      if (exactMatches.length > 0) {
-                        handleSelectFood(exactMatches[0]);
-                      } else {
-                        // fallback mock
-                        const fallbackFood: FoodItem = {
-                          id: `mock-shortcut-${q.name}`,
-                          name: q.name,
-                          name_hi: q.name_hi,
-                          category: q.category,
-                          subcategory: "snack",
-                          reference_weight_g: 100,
-                          reference_unit: "g",
-                          calories_per_100g: q.defaultCal,
-                          protein_g_100g: 0,
-                          carbs_g_100g: 0,
-                          fat_g_100g: 0,
-                          fibre_g_100g: 0,
-                          sodium_mg_100g: null,
-                          source_type: "papa_priority",
-                          source_name: "Quick Shortcuts Fallback",
-                          source_note: null,
-                          is_verified: true,
-                          is_custom: false,
-                          is_active: true,
-                          created_at: new Date().toISOString(),
-                          updated_at: new Date().toISOString()
-                        };
-                        handleSelectFood(fallbackFood);
-                      }
-                    }}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/50 text-left transition-all shadow-2xs flex flex-col justify-between"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-lg shrink-0">{getExactFoodEmoji(q.name, q.category)}</span>
-                      <span className="text-xs font-bold text-slate-900 truncate">{q.name}</span>
+
+              {quickFoodsLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-20 rounded-xl bg-slate-100 animate-pulse border border-slate-200" />
+                  ))}
+                </div>
+              ) : quickFoods.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {quickFoods.map((q) => (
+                    <div
+                      key={q.canonicalKey}
+                      className="group relative p-3 rounded-xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/50 text-left transition-all shadow-2xs flex flex-col justify-between cursor-pointer"
+                      onClick={async () => {
+                        if (quickActionLockRef.current) return;
+                        quickActionLockRef.current = true;
+
+                        recordQuickAddUsage(patientId, q.name);
+
+                        // Fetch full food item details
+                        const { exactMatches } = await searchFoodItems(q.name);
+                        if (exactMatches.length > 0) {
+                          handleSelectFood(exactMatches[0]);
+                        } else {
+                          const fallbackFood: FoodItem = {
+                            id: `quick-${q.canonicalKey}`,
+                            name: q.name,
+                            name_hi: q.name_hi,
+                            category: q.category,
+                            subcategory: "quick_food",
+                            reference_weight_g: 100,
+                            reference_unit: "g",
+                            calories_per_100g: q.defaultCal,
+                            protein_g_100g: 0,
+                            carbs_g_100g: 0,
+                            fat_g_100g: 0,
+                            fibre_g_100g: 0,
+                            sodium_mg_100g: null,
+                            source_type: "user_entered",
+                            source_name: "Quick Food Learned",
+                            source_note: null,
+                            is_verified: true,
+                            is_custom: false,
+                            is_active: true,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString(),
+                          };
+                          handleSelectFood(fallbackFood);
+                        }
+
+                        setTimeout(() => {
+                          quickActionLockRef.current = false;
+                        }, 400);
+                      }}
+                    >
+                      {/* Hide button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          hideQuickFood(patientId, q.name);
+                          setQuickFoods((prev) => prev.filter((item) => item.canonicalKey !== q.canonicalKey));
+                        }}
+                        className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all text-[10px]"
+                        title="Remove from Quick Food"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+
+                      <div className="flex items-center gap-1.5 min-w-0 pr-3">
+                        <span className="text-lg shrink-0">{getExactFoodEmoji(q.name, q.category)}</span>
+                        <span className="text-xs font-bold text-slate-900 truncate">{q.name}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-hindi">
+                        <span className="truncate">{q.name_hi || `${q.distinctDays30d} days`}</span>
+                        <span className="text-emerald-700 font-black font-sans shrink-0 ml-1">~{q.defaultCal} cal</span>
+                      </div>
                     </div>
-                    <span className="text-[11px] text-slate-500 mt-1 flex justify-between font-hindi">
-                      <span className="truncate">{q.name_hi}</span>
-                      <span className="text-emerald-700 font-black font-sans shrink-0 ml-1">~{q.defaultCal} cal</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-center">
+                  <p className="text-xs font-semibold text-slate-700">
+                    आपके बार-बार खाए जाने वाले भोजन यहाँ automatically सीख कर दिखाई देंगे।
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    (Your personalized frequently logged foods will adapt and appear here automatically.)
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

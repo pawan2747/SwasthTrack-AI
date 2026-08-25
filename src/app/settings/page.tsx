@@ -13,6 +13,7 @@ import {
   Phone,
   Ruler,
   Save,
+  RotateCcw,
   ShieldCheck,
   Trash2,
   User,
@@ -45,6 +46,7 @@ import {
   type PatientSettings,
   type WeightUnit,
 } from "@/services/settings-service";
+import { resetQuickFoodPreferences } from "@/services/quick-food-service";
 
 export default function SettingsPage() {
   const [patient, setPatient] = useState<PatientProfile | null>(null);
@@ -335,6 +337,28 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold text-slate-800">Personalized Quick Foods (सीखे गए त्वरित भोजन)</p>
+                <p className="text-[11px] text-slate-500">
+                  Resets learned eating frequency rankings without deleting your past food log history. (लॉग इतिहास डिलीट किए बिना केवल रैंकिंग रीसेट करें)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (patient) {
+                    resetQuickFoodPreferences(patient.id);
+                    showToast("Personalized Quick Food preferences reset successfully. (क्विक फूड प्राथमिकताएं रीसेट कर दी गईं)");
+                  }
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-100 transition-colors"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+                Reset Quick Foods
+              </button>
             </div>
           </div>
         </Card>

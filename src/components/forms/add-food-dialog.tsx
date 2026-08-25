@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { Utensils } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Sparkles, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Select, TextInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
 import { mealTypes } from "@/lib/health-options";
 import { getExactFoodEmoji } from "@/lib/utils";
 import { logFood } from "@/services/patient-service";
+import {
+  getPersonalizedQuickFoods,
+  recordQuickAddUsage,
+  type PersonalizedQuickFoodItem,
+} from "@/services/quick-food-service";
 
 type AddFoodDialogProps = {
   isOpen: boolean;
@@ -145,15 +150,25 @@ export function AddFoodDialog({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [personalizedQuickFoods, setPersonalizedQuickFoods] = useState<PersonalizedQuickFoodItem[]>([]);
+
+  useEffect(() => {
+    if (isOpen && patientId) {
+      getPersonalizedQuickFoods(patientId, mealType, 6)
+        .then(setPersonalizedQuickFoods)
+        .catch(() => {});
+    }
+  }, [isOpen, patientId, mealType]);
 
   // Quick 1-tap select meal
-  function handleSelectQuickMeal(meal: typeof QUICK_INDIAN_MEALS[0]) {
-    setFoodName(meal.name);
-    setMealType(meal.mealType);
-    setCalories(String(meal.calories));
-    setProtein(String(meal.protein));
-    setQuantity(String(meal.quantity));
-    setUnit(meal.unit || "serving");
+  function handleSelectQuickMeal(name: string, mType: string, cals: number, prot: number, qty = 1, u = "serving") {
+    recordQuickAddUsage(patientId, name);
+    setFoodName(name);
+    setMealType(mType);
+    setCalories(String(cals));
+    setProtein(String(prot));
+    setQuantity(String(qty));
+    setUnit(u);
     setError("");
   }
 
@@ -226,43 +241,83 @@ export function AddFoodDialog({
           </div>
         ) : null}
 
-        {/* 1. 1-TAP QUICK INDIAN FOODS WITH EXACT EMOJIS & SPACIOUS PADDING */}
+        {/* 1. 1-TAP QUICK FOODS (PERSONALIZED LEARNED FOODS + SUGGESTIONS) */}
         <div className="space-y-2">
-          <label className="block text-sm font-black text-slate-900">
-            ⭐ 1-क्लिक में चुनें (लोकप्रिय भोजन):
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-emerald-600" />
+              <span>
+                {personalizedQuickFoods.length > 0
+                  ? "आपके नियमित भोजन (Personalized Quick Foods):"
+                  : "⭐ 1-क्लिक में चुनें (लोकप्रिय भोजन):"}
+              </span>
+            </label>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-52 overflow-y-auto p-2 bg-slate-50/80 rounded-2xl border border-slate-200/90 shadow-2xs">
-            {QUICK_INDIAN_MEALS.map((meal) => {
-              const isSelected = foodName === meal.name;
-              const emoji = getExactFoodEmoji(meal.name);
-              return (
-                <button
-                  type="button"
-                  key={meal.name}
-                  onClick={() => handleSelectQuickMeal(meal)}
-                  className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                    isSelected
-                      ? "border-emerald-600 bg-emerald-100/90 text-emerald-950 font-black ring-2 ring-emerald-500/30 shadow-xs"
-                      : "border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/50 font-bold"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 w-full min-w-0">
-                    <span className="text-xl shrink-0">{emoji}</span>
-                    <span className="text-sm font-black truncate leading-tight">
-                      {meal.name}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between w-full text-xs font-bold">
-                    <span className="text-emerald-800">
-                      🔥 ~{meal.calories} kcal
-                    </span>
-                    <span className="text-slate-500 font-semibold">
-                      {meal.tag}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+            {personalizedQuickFoods.length > 0
+              ? personalizedQuickFoods.map((q) => {
+                  const isSelected = foodName === q.name;
+                  const emoji = getExactFoodEmoji(q.name, q.category);
+                  return (
+                    <button
+                      type="button"
+                      key={q.canonicalKey}
+                      onClick={() => handleSelectQuickMeal(q.name, mealType, q.defaultCal, 4, 1, "serving")}
+                      className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-emerald-600 bg-emerald-100/90 text-emerald-950 font-black ring-2 ring-emerald-500/30 shadow-xs"
+                          : "border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/50 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 w-full min-w-0">
+                        <span className="text-xl shrink-0">{emoji}</span>
+                        <span className="text-sm font-black truncate leading-tight">
+                          {q.name}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between w-full text-xs font-bold">
+                        <span className="text-emerald-800">
+                          🔥 ~{q.defaultCal} kcal
+                        </span>
+                        <span className="text-slate-500 font-semibold font-hindi">
+                          {q.name_hi || `${q.distinctDays30d} दिन`}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              : QUICK_INDIAN_MEALS.map((meal) => {
+                  const isSelected = foodName === meal.name;
+                  const emoji = getExactFoodEmoji(meal.name);
+                  return (
+                    <button
+                      type="button"
+                      key={meal.name}
+                      onClick={() => handleSelectQuickMeal(meal.name, meal.mealType, meal.calories, meal.protein, meal.quantity, meal.unit)}
+                      className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-emerald-600 bg-emerald-100/90 text-emerald-950 font-black ring-2 ring-emerald-500/30 shadow-xs"
+                          : "border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/50 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 w-full min-w-0">
+                        <span className="text-xl shrink-0">{emoji}</span>
+                        <span className="text-sm font-black truncate leading-tight">
+                          {meal.name}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between w-full text-xs font-bold">
+                        <span className="text-emerald-800">
+                          🔥 ~{meal.calories} kcal
+                        </span>
+                        <span className="text-slate-500 font-semibold">
+                          {meal.tag}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
           </div>
         </div>
 
