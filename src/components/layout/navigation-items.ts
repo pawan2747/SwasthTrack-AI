@@ -1,6 +1,7 @@
 import {
   Apple,
   FileText,
+  FlaskConical,
   HeartPulse,
   LayoutDashboard,
   Pill,
@@ -24,6 +25,7 @@ export const navigationItems: NavigationItem[] = [
   { href: "/medicines", label: "Medicines", hindiLabel: "दवाइयाँ", icon: Pill },
   { href: "/reports", label: "Reports", hindiLabel: "रिपोर्ट्स", icon: FileText },
   { href: "/caregiver", label: "Caregiver", hindiLabel: "केयरगिवर", icon: UserCheck },
+  { href: "/simulation-lab", label: "Simulation Lab", hindiLabel: "सिमुलेशन लैब", icon: FlaskConical },
   { href: "/profile", label: "Profile", hindiLabel: "प्रोफाइल", icon: UserCircle },
   { href: "/settings", label: "Settings", hindiLabel: "सेटिंग्स", icon: Settings },
 ];
