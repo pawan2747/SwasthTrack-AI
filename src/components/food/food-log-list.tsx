@@ -75,9 +75,13 @@ export function FoodLogList({
 
   // Date handlers (IST Safe)
   const adjustDate = (days: number) => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + days);
-    onDateChange(d.toISOString().split("T")[0]);
+    if (!selectedDate) return;
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const dateObj = new Date(y, m - 1, d + days);
+    const nextY = dateObj.getFullYear();
+    const nextM = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const nextD = String(dateObj.getDate()).padStart(2, "0");
+    onDateChange(`${nextY}-${nextM}-${nextD}`);
   };
 
   const handleEditClick = (item: FoodLogEntry) => {

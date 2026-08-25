@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Clock, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,22 +56,34 @@ export function MedicineSchedule({
     return acc;
   }, {});
 
-  // Map medicineId -> latest status today
-  const statusMap = new Map<string, StatusType>();
-  logs.forEach((log) => {
-    statusMap.set(log.medicine_id, log.status as StatusType);
-  });
+  // Base logs + optimistic manual marks
+  const [pendingMarks, setPendingMarks] = useState<Map<string, StatusType>>(new Map());
+
+  const statusMap = logs.reduce((map, log) => {
+    map.set(log.medicine_id, log.status as StatusType);
+    return map;
+  }, new Map<string, StatusType>(pendingMarks));
 
   async function handleMark(medicineId: string, status: StatusType) {
-    await logMedicineStatus({
-      medicine_id: medicineId,
-      patient_id: patientId,
-      scheduled_time: new Date().toISOString(),
-      taken_time: status === "taken" || status === "late" ? new Date().toISOString() : null,
-      status,
-      notes: null,
+    setPendingMarks((prev: Map<string, StatusType>) => {
+      const next = new Map(prev);
+      next.set(medicineId, status);
+      return next;
     });
-    onRefresh();
+
+    try {
+      await logMedicineStatus({
+        medicine_id: medicineId,
+        patient_id: patientId,
+        scheduled_time: new Date().toISOString(),
+        taken_time: status === "taken" || status === "late" ? new Date().toISOString() : null,
+        status,
+        notes: null,
+      });
+      onRefresh();
+    } catch {
+      onRefresh();
+    }
   }
 
   return (
