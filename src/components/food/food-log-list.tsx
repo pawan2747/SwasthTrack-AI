@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, Select, TextInput } from "@/components/ui/form-field";
 import { deleteFoodLog, updateFoodLog, copyPreviousMeal, type FoodLogEntry } from "@/services/patient-service";
+import { getExactFoodEmoji } from "@/lib/utils";
 
 type FoodLogListProps = {
   logs: FoodLogEntry[];
@@ -286,6 +287,7 @@ export function FoodLogList({
                         <div key={item.id} className="p-4 hover:bg-slate-50/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-colors">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xl shrink-0">{getExactFoodEmoji(item.food_name)}</span>
                               <span className="font-bold text-slate-900">{item.food_name}</span>
                               <Badge variant={item.calorie_confidence === "High" ? "green" : item.calorie_confidence === "Medium" ? "blue" : "amber"}>
                                 {item.calorie_confidence} confidence

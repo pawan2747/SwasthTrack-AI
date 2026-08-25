@@ -38,6 +38,9 @@ export function AddSleepDialog({
   const [date, setDate] = useState(getTodayDateString());
   const [sleepHours, setSleepHours] = useState("7.5");
   const [selectedQuality, setSelectedQuality] = useState("गहरी व अच्छी नींद (Good Sleep)");
+  const [bedtime, setBedtime] = useState("22:30");
+  const [wakeTime, setWakeTime] = useState("06:00");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -53,13 +56,14 @@ export function AddSleepDialog({
 
     try {
       setLoading(true);
+      const combinedNotes = [selectedQuality, notes.trim()].filter(Boolean).join(" · ");
       await logSleep({
         patient_id: patientId,
         date,
         sleep_hours: hours,
-        bedtime: "22:30",
-        wake_time: "06:00",
-        notes: selectedQuality || null,
+        bedtime: bedtime || null,
+        wake_time: wakeTime || null,
+        notes: combinedNotes || null,
       });
 
       onClose();
@@ -77,18 +81,19 @@ export function AddSleepDialog({
       onClose={onClose}
       title="Record Sleep"
       hindiTitle="नींद का समय दर्ज करें"
-      description="कल रात कितने घंटे सोए? आसानी से 1-क्लिक में चुनें।"
+      description="त्वरित 1-टैप में चुनें या नीचे खुद से सही समय टाइप करें।"
+      maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-sm font-bold text-rose-800">
             {error}
           </div>
         ) : null}
 
-        {/* 1. 1-TAP PRESET SLEEP HOURS (Papa Friendly) */}
-        <div>
-          <label className="block text-sm font-black text-slate-900 mb-2">
+        {/* 1. 1-TAP PRESET SLEEP HOURS */}
+        <div className="space-y-2">
+          <label className="block text-sm font-black text-slate-900">
             ⭐ कितने घंटे सोए? (1-टैप में चुनें):
           </label>
           <div className="grid grid-cols-3 gap-2.5">
@@ -99,9 +104,9 @@ export function AddSleepDialog({
                   type="button"
                   key={preset.hours}
                   onClick={() => setSleepHours(preset.hours)}
-                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all text-center ${
+                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all text-center cursor-pointer ${
                     isSelected
-                      ? "border-indigo-600 bg-indigo-50 text-indigo-950 font-black ring-2 ring-indigo-500/30 shadow-xs scale-102"
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-950 font-black ring-2 ring-indigo-500/30 shadow-xs"
                       : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50 font-bold"
                   }`}
                 >
@@ -113,9 +118,70 @@ export function AddSleepDialog({
           </div>
         </div>
 
-        {/* 2. SLEEP QUALITY SELECTOR */}
-        <div>
-          <label className="block text-sm font-black text-slate-900 mb-2">
+        {/* 2. MANUAL DURATION & DATE INPUTS */}
+        <div className="space-y-4 pt-2 border-t border-slate-200">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-500">
+            नींद का सटीक मान (Custom Value डालें):
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="कुल नींद के घंटे (Sleep Hours)" hint="उदा. 7.5">
+              <TextInput
+                type="number"
+                step="0.25"
+                min="0.5"
+                max="24"
+                value={sleepHours}
+                onChange={(e) => setSleepHours(e.target.value)}
+                className="text-lg font-black text-indigo-950"
+                required
+              />
+            </Field>
+
+            <Field label="दिनांक (Date)">
+              <TextInput
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="text-base font-bold"
+                required
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="सोने का समय (Bedtime)">
+              <TextInput
+                type="time"
+                value={bedtime}
+                onChange={(e) => setBedtime(e.target.value)}
+                className="text-sm font-bold"
+              />
+            </Field>
+
+            <Field label="जागने का समय (Wake Time)">
+              <TextInput
+                type="time"
+                value={wakeTime}
+                onChange={(e) => setWakeTime(e.target.value)}
+                className="text-sm font-bold"
+              />
+            </Field>
+          </div>
+
+          <Field label="टिप्पणी (Notes - ऐच्छिक)">
+            <TextInput
+              placeholder="उदा. रात को 1 बार नींद खुली"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="text-base font-medium"
+            />
+          </Field>
+        </div>
+
+        {/* 3. SLEEP QUALITY SELECTOR */}
+        <div className="space-y-2 pt-2 border-t border-slate-200">
+          <label className="block text-sm font-black text-slate-900">
             ⭐ नींद कैसी रही? (Sleep Quality):
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -126,7 +192,7 @@ export function AddSleepDialog({
                   type="button"
                   key={q.value}
                   onClick={() => setSelectedQuality(q.value)}
-                  className={`p-2.5 rounded-xl border-2 text-xs sm:text-sm font-bold text-left transition-all flex items-center justify-between ${
+                  className={`p-2.5 rounded-xl border-2 text-xs sm:text-sm font-bold text-left transition-all flex items-center justify-between cursor-pointer ${
                     isSelected
                       ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-black shadow-2xs"
                       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -138,19 +204,6 @@ export function AddSleepDialog({
               );
             })}
           </div>
-        </div>
-
-        {/* 3. DATE SELECTOR */}
-        <div className="pt-1">
-          <Field label="दिनांक (Date)">
-            <TextInput
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="text-base font-bold"
-              required
-            />
-          </Field>
         </div>
 
         {/* SUBMIT BUTTON */}

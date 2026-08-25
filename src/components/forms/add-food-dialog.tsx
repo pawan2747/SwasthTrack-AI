@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Select, TextInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
 import { mealTypes } from "@/lib/health-options";
+import { getExactFoodEmoji } from "@/lib/utils";
 import { logFood } from "@/services/patient-service";
 
 type AddFoodDialogProps = {
@@ -16,87 +17,115 @@ type AddFoodDialogProps = {
   onSuccess?: () => void;
 };
 
-// Popular 1-Tap Desi Indian Meals for Papa
+// Popular Desi Indian Meals for Papa with exact emojis and realistic defaults
 const QUICK_INDIAN_MEALS = [
   {
-    icon: "🫓",
     name: "2 गेहूं की रोटी + दाल + हरी सब्जी",
     mealType: "Lunch",
     calories: 350,
     protein: 12,
+    quantity: 1,
+    unit: "थाली",
     tag: "दोपहर/रात भोजन",
   },
   {
-    icon: "☕",
-    name: "बिना चीनी की चाय + 2 बिस्कुट / टोस्ट",
+    name: "बिना चीनी की चाय + 2 बिस्कुट",
     mealType: "Breakfast",
     calories: 80,
     protein: 2,
+    quantity: 1,
+    unit: "कप",
     tag: "सुबह की चाय",
   },
   {
-    icon: "🥣",
-    name: "दलिया / ओट्स (1 कटोरी)",
+    name: "दलिया / ओट्स",
     mealType: "Breakfast",
     calories: 180,
     protein: 6,
+    quantity: 1,
+    unit: "कटोरी",
     tag: "हल्का नाश्ता",
   },
   {
-    icon: "🍚",
     name: "दाल + चावल + सादा दही",
     mealType: "Lunch",
     calories: 380,
     protein: 10,
+    quantity: 1,
+    unit: "थाली",
     tag: "दोपहर भोजन",
   },
   {
-    icon: "🥗",
-    name: "मूंग दाल खिचड़ी + छाछ/दही",
+    name: "मूंग दाल खिचड़ी + छाछ",
     mealType: "Dinner",
     calories: 280,
     protein: 9,
+    quantity: 1,
+    unit: "कटोरी",
     tag: "हल्का डिनर",
   },
   {
-    icon: "🍎",
-    name: "1 सेब / पपीता / मौसमी फल",
+    name: "1 सेब (Apple)",
     mealType: "Mid-morning",
     calories: 60,
     protein: 1,
-    tag: "फल",
+    quantity: 1,
+    unit: "पीस",
+    tag: "ताज़ा फल",
   },
   {
-    icon: "🥛",
+    name: "1 केला (Banana)",
+    mealType: "Mid-morning",
+    calories: 89,
+    protein: 1,
+    quantity: 1,
+    unit: "पीस",
+    tag: "ताज़ा फल",
+  },
+  {
     name: "1 गिलास गर्म दूध",
     mealType: "Bedtime",
     calories: 120,
     protein: 6,
+    quantity: 1,
+    unit: "गिलास",
     tag: "रात को",
   },
   {
-    icon: "🥜",
-    name: "भुना मखाना (1 कटोरी) + 5 बादाम",
+    name: "भुना मखाना + 5 बादाम",
     mealType: "Evening snack",
     calories: 110,
     protein: 4,
+    quantity: 1,
+    unit: "कटोरी",
     tag: "शाम का नाश्ता",
   },
   {
-    icon: "🥞",
-    name: "पोहा / उपमा (1 प्लेट)",
+    name: "पोहा / उपमा",
     mealType: "Breakfast",
     calories: 220,
     protein: 5,
+    quantity: 1,
+    unit: "प्लेट",
     tag: "नाश्ता",
   },
   {
-    icon: "🥒",
     name: "हरी सलाद (खीरा, टमाटर, गाजर)",
     mealType: "Lunch",
     calories: 35,
     protein: 1,
+    quantity: 1,
+    unit: "प्लेट",
     tag: "सलाद",
+  },
+  {
+    name: "भिंडी की सब्जी (कम तेल)",
+    mealType: "Dinner",
+    calories: 80,
+    protein: 3,
+    quantity: 1,
+    unit: "कटोरी",
+    tag: "सब्जी",
   },
 ];
 
@@ -113,6 +142,7 @@ export function AddFoodDialog({
   const [unit, setUnit] = useState("serving");
   const [calories, setCalories] = useState("");
   const [protein, setProtein] = useState("");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -122,8 +152,8 @@ export function AddFoodDialog({
     setMealType(meal.mealType);
     setCalories(String(meal.calories));
     setProtein(String(meal.protein));
-    setQuantity("1");
-    setUnit("serving");
+    setQuantity(String(meal.quantity));
+    setUnit(meal.unit || "serving");
     setError("");
   }
 
@@ -132,7 +162,7 @@ export function AddFoodDialog({
     setError("");
 
     if (!foodName.trim()) {
-      setError("कृपया भोजन का नाम लिखें या नीचे दिए गए विकल्पों में से चुनें");
+      setError("कृपया भोजन का नाम लिखें या ऊपर दिए गए विकल्पों में से चुनें");
       return;
     }
 
@@ -162,12 +192,13 @@ export function AddFoodDialog({
         source_type: "user_entered",
         source_note: "Logged via easy quick meals dialog",
         consumed_at: new Date().toISOString(),
-        notes: null,
+        notes: notes.trim() || null,
       });
 
       setFoodName("");
       setCalories("");
       setProtein("");
+      setNotes("");
       onClose();
       onSuccess?.();
     } catch (err) {
@@ -185,52 +216,65 @@ export function AddFoodDialog({
       onClose={onClose}
       title="Log Food & Meals"
       hindiTitle="भोजन दर्ज करें"
-      description="आसानी से नीचे दिए गए भोजन में से 1-टैप में चुनें या नाम लिखें।"
+      description="त्वरित चयन करें या नीचे खुद से कोई भी मान टाइप करें।"
+      maxWidth="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {error ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-sm font-bold text-rose-800">
             {error}
           </div>
         ) : null}
 
-        {/* 1. 1-TAP POPULAR INDIAN FOODS (Papa Friendly) */}
-        <div>
-          <label className="block text-sm font-black text-slate-900 mb-2">
+        {/* 1. 1-TAP QUICK INDIAN FOODS WITH EXACT EMOJIS & SPACIOUS PADDING */}
+        <div className="space-y-2">
+          <label className="block text-sm font-black text-slate-900">
             ⭐ 1-क्लिक में चुनें (लोकप्रिय भोजन):
           </label>
-          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 bg-slate-50 rounded-2xl border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-52 overflow-y-auto p-2 bg-slate-50/80 rounded-2xl border border-slate-200/90 shadow-2xs">
             {QUICK_INDIAN_MEALS.map((meal) => {
               const isSelected = foodName === meal.name;
+              const emoji = getExactFoodEmoji(meal.name);
               return (
                 <button
                   type="button"
                   key={meal.name}
                   onClick={() => handleSelectQuickMeal(meal)}
-                  className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
+                  className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
                     isSelected
-                      ? "border-emerald-600 bg-emerald-100/80 text-emerald-950 font-black ring-2 ring-emerald-500/30 shadow-2xs"
-                      : "border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/40 font-bold"
+                      ? "border-emerald-600 bg-emerald-100/90 text-emerald-950 font-black ring-2 ring-emerald-500/30 shadow-xs"
+                      : "border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/50 font-bold"
                   }`}
                 >
-                  <span className="text-sm font-black flex items-center gap-1.5 leading-snug">
-                    <span className="text-base">{meal.icon}</span>
-                    <span className="truncate">{meal.name}</span>
-                  </span>
-                  <span className="mt-1 text-[11px] font-bold text-emerald-800">
-                    🔥 ~{meal.calories} kcal ({meal.tag})
-                  </span>
+                  <div className="flex items-center gap-2 w-full min-w-0">
+                    <span className="text-xl shrink-0">{emoji}</span>
+                    <span className="text-sm font-black truncate leading-tight">
+                      {meal.name}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between w-full text-xs font-bold">
+                    <span className="text-emerald-800">
+                      🔥 ~{meal.calories} kcal
+                    </span>
+                    <span className="text-slate-500 font-semibold">
+                      {meal.tag}
+                    </span>
+                  </div>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* 2. CHOSEN MEAL DETAILS */}
-        <div className="space-y-3 pt-1 border-t border-slate-200">
+        {/* 2. CUSTOM EDITABLE DETAILS (MANUAL INPUTS) */}
+        <div className="space-y-4 pt-2 border-t border-slate-200">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-500">
+            भोजन का विवरण (खुद से बदलें या टाइप करें):
+          </p>
+
           <Field label="भोजन का नाम (Food Name)">
             <TextInput
-              placeholder="e.g. 2 रोटी और दाल, दलिया, फल..."
+              placeholder="उदा. 2 रोटी और दाल, सेब, खिचड़ी, चाय..."
               value={foodName}
               onChange={(e) => setFoodName(e.target.value)}
               className="text-base font-bold"
@@ -238,7 +282,7 @@ export function AddFoodDialog({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="भोजन का समय (Meal Type)">
               <Select
                 value={mealType}
@@ -253,16 +297,59 @@ export function AddFoodDialog({
               </Select>
             </Field>
 
-            <Field label="अनुमानित कैलोरी (Calories kcal)">
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="मात्रा (Quantity)">
+                <TextInput
+                  type="number"
+                  step="0.5"
+                  placeholder="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="text-base font-bold"
+                />
+              </Field>
+
+              <Field label="इकाई (Unit)">
+                <TextInput
+                  placeholder="serving/कटोरी"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="text-base font-bold"
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="अनुमानित कैलोरी (Calories kcal)" hint="e.g. 250">
               <TextInput
                 type="number"
-                placeholder="e.g. 300"
+                placeholder="e.g. 250"
                 value={calories}
                 onChange={(e) => setCalories(e.target.value)}
                 className="text-base font-bold"
               />
             </Field>
+
+            <Field label="प्रोटीन (Protein grams - ऐच्छिक)" hint="e.g. 8">
+              <TextInput
+                type="number"
+                placeholder="e.g. 8"
+                value={protein}
+                onChange={(e) => setProtein(e.target.value)}
+                className="text-base font-bold"
+              />
+            </Field>
           </div>
+
+          <Field label="टिप्पणी / अन्य जानकारी (Notes - ऐच्छिक)">
+            <TextInput
+              placeholder="उदा. नाश्ते में लिया, कम घी में बना..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="text-sm font-medium"
+            />
+          </Field>
         </div>
 
         {/* SUBMIT BUTTON */}

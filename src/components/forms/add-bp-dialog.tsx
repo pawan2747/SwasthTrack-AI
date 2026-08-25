@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Field, TextInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
 import { logBloodPressure } from "@/services/patient-service";
 
@@ -14,10 +15,10 @@ type AddBPDialogProps = {
 };
 
 const BP_PRESETS = [
-  { label: "120 / 80", hint: "सामान्य (Normal)", sys: "120", dia: "80", color: "emerald" },
-  { label: "130 / 85", hint: "हल्का बढ़ा (Mild High)", sys: "130", dia: "85", color: "amber" },
-  { label: "140 / 90", hint: "उच्च (High BP)", sys: "140", dia: "90", color: "rose" },
-  { label: "115 / 75", hint: "उत्तम (Optimal)", sys: "115", dia: "75", color: "emerald" },
+  { label: "120 / 80", hint: "सामान्य (Normal)", sys: "120", dia: "80" },
+  { label: "130 / 85", hint: "हल्का बढ़ा (Mild High)", sys: "130", dia: "85" },
+  { label: "140 / 90", hint: "उच्च (High BP)", sys: "140", dia: "90" },
+  { label: "115 / 75", hint: "उत्तम (Optimal)", sys: "115", dia: "75" },
 ];
 
 export function AddBPDialog({
@@ -28,8 +29,9 @@ export function AddBPDialog({
 }: AddBPDialogProps) {
   const [systolic, setSystolic] = useState("120");
   const [diastolic, setDiastolic] = useState("80");
-  const [pulse] = useState("72");
+  const [pulse, setPulse] = useState("72");
   const [readingType, setReadingType] = useState<"Morning" | "Evening">("Morning");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -52,12 +54,17 @@ export function AddBPDialog({
     const pulseNum = pulse ? parseInt(pulse, 10) : undefined;
 
     if (isNaN(sysNum) || sysNum < 50 || sysNum > 280) {
-      setError("कृपया सही सिस्टोलिक BP दर्ज करें (ऊपर वाला मान)");
+      setError("कृपया सही सिस्टोलिक BP दर्ज करें (ऊपर वाला मान 50 से 280 के बीच)");
       return;
     }
 
     if (isNaN(diaNum) || diaNum < 30 || diaNum > 180) {
-      setError("कृपया सही डायस्टोलिक BP दर्ज करें (नीचे वाला मान)");
+      setError("कृपया सही डायस्टोलिक BP दर्ज करें (नीचे वाला मान 30 से 180 के बीच)");
+      return;
+    }
+
+    if (sysNum <= diaNum) {
+      setError("सिस्टोलिक BP (ऊपर वाला) डायस्टोलिक से अधिक होना चाहिए");
       return;
     }
 
@@ -70,7 +77,7 @@ export function AddBPDialog({
         pulse: pulseNum ?? null,
         reading_type: readingType,
         measured_at: new Date().toISOString(),
-        notes: null,
+        notes: notes.trim() || null,
       });
 
       onClose();
@@ -88,25 +95,26 @@ export function AddBPDialog({
       onClose={onClose}
       title="Record Blood Pressure"
       hindiTitle="रक्तचाप (BP) दर्ज करें"
-      description="डिजिटल BP मशीन से मापें और 1-क्लिक में दर्ज करें।"
+      description="त्वरित 1-टैप में चुनें या खुद से सही मान टाइप करें।"
+      maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-sm font-bold text-rose-800">
             {error}
           </div>
         ) : null}
 
         {/* 1. TIME OF DAY (Morning vs Evening) */}
-        <div>
-          <label className="block text-sm font-black text-slate-900 mb-1.5">
-            ⭐ नापने का समय (Time):
+        <div className="space-y-2">
+          <label className="block text-sm font-black text-slate-900">
+            ⭐ नापने का समय (Reading Time):
           </label>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setReadingType("Morning")}
-              className={`p-3 rounded-2xl border-2 text-sm sm:text-base font-black transition-all flex items-center justify-center gap-2 ${
+              className={`p-3 rounded-2xl border-2 text-sm sm:text-base font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 readingType === "Morning"
                   ? "border-amber-500 bg-amber-50 text-amber-950 ring-2 ring-amber-400/30 shadow-xs"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -117,7 +125,7 @@ export function AddBPDialog({
             <button
               type="button"
               onClick={() => setReadingType("Evening")}
-              className={`p-3 rounded-2xl border-2 text-sm sm:text-base font-black transition-all flex items-center justify-center gap-2 ${
+              className={`p-3 rounded-2xl border-2 text-sm sm:text-base font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 readingType === "Evening"
                   ? "border-indigo-600 bg-indigo-50 text-indigo-950 ring-2 ring-indigo-500/30 shadow-xs"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -129,8 +137,8 @@ export function AddBPDialog({
         </div>
 
         {/* 2. 1-TAP PRESETS */}
-        <div>
-          <label className="block text-sm font-black text-slate-900 mb-1.5">
+        <div className="space-y-2">
+          <label className="block text-sm font-black text-slate-900">
             ⭐ 1-टैप त्वरित मान (Quick Presets):
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -144,7 +152,7 @@ export function AddBPDialog({
                     setSystolic(p.sys);
                     setDiastolic(p.dia);
                   }}
-                  className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                  className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
                     isSelected
                       ? "border-rose-600 bg-rose-50 text-rose-950 font-black ring-2 ring-rose-500/30 shadow-2xs"
                       : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50 font-bold"
@@ -158,48 +166,91 @@ export function AddBPDialog({
           </div>
         </div>
 
-        {/* 3. STEPPERS FOR SYSTOLIC & DIASTOLIC */}
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-          <div className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50 text-center">
-            <p className="text-xs font-black text-slate-600 uppercase">ऊपर वाला (Systolic)</p>
-            <p className="text-3xl font-black text-rose-700 my-1">{systolic}</p>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <button
-                type="button"
-                onClick={() => adjustSystolic(-5)}
-                className="h-10 w-10 rounded-xl bg-white border-2 border-slate-300 font-black text-lg text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
-              >
-                -5
-              </button>
-              <button
-                type="button"
-                onClick={() => adjustSystolic(+5)}
-                className="h-10 w-10 rounded-xl bg-white border-2 border-slate-300 font-black text-lg text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
-              >
-                +5
-              </button>
+        {/* 3. STEPPERS & DIRECT MANUAL INPUTS FOR SYSTOLIC & DIASTOLIC */}
+        <div className="space-y-3 pt-2 border-t border-slate-200">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-500">
+            सटीक मान (टाइप करें या + / - बटन दबाएं):
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50/80 text-center">
+              <p className="text-xs font-black text-slate-600 uppercase">ऊपर वाला (Systolic)</p>
+              <div className="my-2">
+                <input
+                  type="number"
+                  value={systolic}
+                  onChange={(e) => setSystolic(e.target.value)}
+                  className="w-full text-center text-3xl font-black text-rose-700 bg-white border border-slate-300 rounded-xl py-1 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="120"
+                />
+              </div>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => adjustSystolic(-5)}
+                  className="h-10 w-11 rounded-xl bg-white border-2 border-slate-300 font-black text-base text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
+                >
+                  -5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustSystolic(+5)}
+                  className="h-10 w-11 rounded-xl bg-white border-2 border-slate-300 font-black text-base text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
+                >
+                  +5
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl border-2 border-slate-200 bg-slate-50/80 text-center">
+              <p className="text-xs font-black text-slate-600 uppercase">नीचे वाला (Diastolic)</p>
+              <div className="my-2">
+                <input
+                  type="number"
+                  value={diastolic}
+                  onChange={(e) => setDiastolic(e.target.value)}
+                  className="w-full text-center text-3xl font-black text-rose-700 bg-white border border-slate-300 rounded-xl py-1 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  placeholder="80"
+                />
+              </div>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => adjustDiastolic(-5)}
+                  className="h-10 w-11 rounded-xl bg-white border-2 border-slate-300 font-black text-base text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
+                >
+                  -5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustDiastolic(+5)}
+                  className="h-10 w-11 rounded-xl bg-white border-2 border-slate-300 font-black text-base text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
+                >
+                  +5
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50 text-center">
-            <p className="text-xs font-black text-slate-600 uppercase">नीचे वाला (Diastolic)</p>
-            <p className="text-3xl font-black text-rose-700 my-1">{diastolic}</p>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <button
-                type="button"
-                onClick={() => adjustDiastolic(-5)}
-                className="h-10 w-10 rounded-xl bg-white border-2 border-slate-300 font-black text-lg text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
-              >
-                -5
-              </button>
-              <button
-                type="button"
-                onClick={() => adjustDiastolic(+5)}
-                className="h-10 w-10 rounded-xl bg-white border-2 border-slate-300 font-black text-lg text-slate-800 hover:bg-slate-100 flex items-center justify-center active:scale-95 shadow-2xs"
-              >
-                +5
-              </button>
-            </div>
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Field label="पल्स रेट (Pulse bpm - ऐच्छिक)">
+              <TextInput
+                type="number"
+                placeholder="उदा. 72"
+                value={pulse}
+                onChange={(e) => setPulse(e.target.value)}
+                className="text-base font-bold"
+              />
+            </Field>
+
+            <Field label="टिप्पणी (Notes - ऐच्छिक)">
+              <TextInput
+                placeholder="उदा. दवाई लेने के बाद"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="text-base font-medium"
+              />
+            </Field>
           </div>
         </div>
 

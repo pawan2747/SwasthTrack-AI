@@ -27,6 +27,7 @@ import {
   type FoodItem,
   type FoodPortion
 } from "@/services/patient-service";
+import { getExactFoodEmoji } from "@/lib/utils";
 
 type FoodEntryPanelProps = {
   patientId: string;
@@ -461,12 +462,12 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
                       onClick={() => handleSelectFood(food)}
                       className="p-3.5 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-colors group"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">
-                          {food.category === "fruit" ? "🍎" : food.category === "dairy" ? "🥛" : "🍲"}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-2xl shrink-0">
+                          {getExactFoodEmoji(food.name, food.category)}
                         </span>
-                        <div>
-                          <span className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                        <div className="min-w-0">
+                          <span className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors truncate block">
                             {food.name}
                           </span>
                           {food.name_hi && (
@@ -606,12 +607,15 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
                         handleSelectFood(fallbackFood);
                       }
                     }}
-                    className="p-2.5 rounded-xl border border-slate-100 hover:border-emerald-100 bg-slate-50/50 hover:bg-emerald-50/20 text-left transition-all hover:scale-[1.01] flex flex-col justify-between"
+                    className="p-3 rounded-xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-emerald-50/50 text-left transition-all shadow-2xs flex flex-col justify-between"
                   >
-                    <span className="text-xs font-semibold text-slate-800 line-clamp-1">{q.name}</span>
-                    <span className="text-[10px] text-slate-400 mt-1 flex justify-between font-hindi">
-                      <span>{q.name_hi}</span>
-                      <span className="text-emerald-700 font-bold font-sans">~{q.defaultCal} cal</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-lg shrink-0">{getExactFoodEmoji(q.name, q.category)}</span>
+                      <span className="text-xs font-bold text-slate-900 truncate">{q.name}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-500 mt-1 flex justify-between font-hindi">
+                      <span className="truncate">{q.name_hi}</span>
+                      <span className="text-emerald-700 font-black font-sans shrink-0 ml-1">~{q.defaultCal} cal</span>
                     </span>
                   </button>
                 ))}
