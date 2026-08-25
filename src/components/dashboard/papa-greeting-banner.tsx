@@ -50,11 +50,11 @@ export function PapaGreetingBanner({ patient }: PapaGreetingBannerProps) {
           <div className="space-y-1 min-w-0">
             {/* Header Greeting & Category Badge */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-rose-800 flex items-center gap-1">
+              <span className="text-xs sm:text-sm font-black text-rose-900 flex items-center gap-1 font-hindi">
                 {greetingText}
               </span>
               {message.tag && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100/80 px-2 py-0.5 text-[10px] font-bold text-rose-900 border border-rose-200/60">
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100/80 px-2 py-0.5 text-[10px] font-bold text-rose-900 border border-rose-200/60 font-hindi">
                   <Heart className="h-2.5 w-2.5 fill-rose-500 text-rose-500" />
                   <span>{message.tag}</span>
                 </span>
@@ -62,13 +62,13 @@ export function PapaGreetingBanner({ patient }: PapaGreetingBannerProps) {
             </div>
 
             {/* Main Daily Message */}
-            <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug tracking-tight">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug tracking-tight font-hindi">
               &ldquo;{message.text}&rdquo;
             </h2>
 
             {/* Subtext */}
             {message.subtext && (
-              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed font-hindi">
                 {message.subtext}
               </p>
             )}
@@ -76,10 +76,10 @@ export function PapaGreetingBanner({ patient }: PapaGreetingBannerProps) {
         </div>
 
         {/* Small subtle sparkle indicator */}
-        <div className="hidden md:flex items-center gap-1 rounded-xl bg-white/90 px-3 py-1.5 border border-rose-100/80 text-xs font-bold text-rose-900 shadow-2xs shrink-0 self-start sm:self-center">
+        <div className="hidden md:flex items-center gap-1.5 rounded-xl bg-white/90 px-3 py-1.5 border border-rose-100/80 text-xs font-bold text-rose-900 shadow-2xs shrink-0 self-start sm:self-center">
           <Sparkles className="h-3.5 w-3.5 text-rose-500" />
           <span className="text-[11px] font-hindi">
-            {isSpecialLoveMessage ? "Forever In Our Hearts" : "Daily Family Care"}
+            {isSpecialLoveMessage ? "सदा हमारे दिल में ❤️" : "परिवार का स्नेह"}
           </span>
         </div>
       </div>
