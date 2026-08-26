@@ -29,7 +29,7 @@ import {
 import { AddActivityDialog } from "@/components/forms/add-activity-dialog";
 import { AddBPDialog } from "@/components/forms/add-bp-dialog";
 import { AddFoodDialog } from "@/components/forms/add-food-dialog";
-import { AddMedicineDialog } from "@/components/forms/add-medicine-dialog";
+import { QuickMarkMedicineDialog } from "@/components/forms/quick-mark-medicine-dialog";
 import { AddSleepDialog } from "@/components/forms/add-sleep-dialog";
 import { AddWeightDialog } from "@/components/forms/add-weight-dialog";
 import { EditPatientDialog } from "@/components/forms/edit-patient-dialog";
@@ -276,12 +276,12 @@ export default function DashboardPage() {
         }}
       />
 
-      <AddMedicineDialog
+      <QuickMarkMedicineDialog
         isOpen={isMedicineOpen}
         onClose={() => setIsMedicineOpen(false)}
         patientId={data.patient.id}
         onSuccess={() => {
-          showToast("Medicine saved! / दवाई दर्ज हो गई");
+          showToast("Medicine status updated! / दवाई की स्थिति दर्ज हो गई");
           loadData();
         }}
       />

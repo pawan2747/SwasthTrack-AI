@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCheck, Clock, Edit3, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Calendar,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Edit3,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +21,10 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
+  getMedicineLogsByDate,
+  getTodayDateString,
   logMedicineStatus,
+  deleteMedicineLog,
   type MedicineItem,
   type MedicineLogEntry,
 } from "@/services/patient-service";
@@ -21,7 +33,7 @@ import { AddMedicineDialog } from "@/components/forms/add-medicine-dialog";
 type MedicineScheduleProps = {
   patientId: string;
   medicines: MedicineItem[];
-  logs: MedicineLogEntry[];
+  logs?: MedicineLogEntry[];
   onAddMedicine: () => void;
   onRefresh: () => void;
 };
@@ -29,9 +41,9 @@ type MedicineScheduleProps = {
 type StatusType = "taken" | "late" | "missed" | "pending";
 
 const statusStyles: Record<StatusType, string> = {
-  taken: "border-emerald-500 bg-emerald-600 text-white font-black shadow-sm ring-2 ring-emerald-600/30",
-  late: "border-amber-500 bg-amber-500 text-white font-black shadow-sm ring-2 ring-amber-500/30",
-  missed: "border-rose-500 bg-rose-600 text-white font-black shadow-sm ring-2 ring-rose-600/30",
+  taken: "border-emerald-500 bg-emerald-600 text-white font-black shadow-md ring-2 ring-emerald-600/30",
+  late: "border-amber-500 bg-amber-500 text-white font-black shadow-md ring-2 ring-amber-500/30",
+  missed: "border-rose-500 bg-rose-600 text-white font-black shadow-md ring-2 ring-rose-600/30",
   pending: "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-bold",
 };
 
@@ -46,51 +58,71 @@ function getMedicinePeriod(timeStr: string): "Morning" | "Afternoon" | "Evening"
 export function MedicineSchedule({
   patientId,
   medicines,
-  logs,
+  logs: initialLogs,
   onAddMedicine,
   onRefresh,
 }: MedicineScheduleProps) {
-  const periods = ["Morning", "Afternoon", "Evening", "Night"] as const;
-
-  const grouped = periods.reduce<Record<string, MedicineItem[]>>((acc, period) => {
-    acc[period] = medicines.filter((m) => getMedicinePeriod(m.scheduled_time) === period);
-    return acc;
-  }, {});
-
-  // Base logs + optimistic manual marks
+  const todayStr = getTodayDateString();
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [currentLogs, setCurrentLogs] = useState<MedicineLogEntry[]>(initialLogs || []);
   const [pendingMarks, setPendingMarks] = useState<Map<string, StatusType>>(new Map());
   const [rollbackError, setRollbackError] = useState<string | null>(null);
   const [bulkSuccessMsg, setBulkSuccessMsg] = useState<string | null>(null);
   const [medicineToEdit, setMedicineToEdit] = useState<MedicineItem | null>(null);
 
-  const statusMap = logs.reduce((map, log) => {
+  // Load logs whenever selectedDate or patientId changes
+  useEffect(() => {
+    getMedicineLogsByDate(patientId, selectedDate).then((fetched) => {
+      setCurrentLogs(fetched);
+      setPendingMarks(new Map());
+    });
+  }, [patientId, selectedDate]);
+
+  function adjustDate(offsetDays: number) {
+    const curr = new Date(selectedDate);
+    curr.setDate(curr.getDate() + offsetDays);
+    const y = curr.getFullYear();
+    const m = String(curr.getMonth() + 1).padStart(2, "0");
+    const d = String(curr.getDate()).padStart(2, "0");
+    setSelectedDate(`${y}-${m}-${d}`);
+  }
+
+  const periods = ["Morning", "Afternoon", "Evening", "Night"] as const;
+  const grouped = periods.reduce<Record<string, MedicineItem[]>>((acc, period) => {
+    acc[period] = medicines.filter((m) => getMedicinePeriod(m.scheduled_time) === period);
+    return acc;
+  }, {});
+
+  const statusMap = currentLogs.reduce((map, log) => {
     map.set(log.medicine_id, log.status as StatusType);
     return map;
   }, new Map<string, StatusType>(pendingMarks));
 
-  async function handleMark(medicineId: string, status: StatusType) {
+  async function handleMark(medicine: MedicineItem, status: StatusType) {
     const previousPending = new Map(pendingMarks);
     setRollbackError(null);
 
     // Optimistic update
-    setPendingMarks((prev: Map<string, StatusType>) => {
+    setPendingMarks((prev) => {
       const next = new Map(prev);
-      next.set(medicineId, status);
+      next.set(medicine.id, status);
       return next;
     });
 
     try {
+      const targetTime = `${selectedDate}T${medicine.scheduled_time}`;
       await logMedicineStatus({
-        medicine_id: medicineId,
+        medicine_id: medicine.id,
         patient_id: patientId,
-        scheduled_time: new Date().toISOString(),
-        taken_time: status === "taken" || status === "late" ? new Date().toISOString() : null,
+        scheduled_time: targetTime,
+        taken_time: status === "taken" || status === "late" ? targetTime : null,
         status,
         notes: null,
       });
+      const updated = await getMedicineLogsByDate(patientId, selectedDate);
+      setCurrentLogs(updated);
       onRefresh();
     } catch {
-      // Rollback to previous state on failure (§35)
       setPendingMarks(previousPending);
       setRollbackError("Update save नहीं हो पाया। कृपया पुनः प्रयास करें।");
       setTimeout(() => setRollbackError(null), 5000);
@@ -98,7 +130,23 @@ export function MedicineSchedule({
     }
   }
 
-  // 1-Tap Mark All Active Medicines Taken
+  // Unmark / Reset an entry
+  async function handleUnmark(medicine: MedicineItem) {
+    const existingLog = currentLogs.find((l) => l.medicine_id === medicine.id);
+    if (existingLog) {
+      await deleteMedicineLog(existingLog.id);
+    }
+    setPendingMarks((prev) => {
+      const next = new Map(prev);
+      next.delete(medicine.id);
+      return next;
+    });
+    const updated = await getMedicineLogsByDate(patientId, selectedDate);
+    setCurrentLogs(updated);
+    onRefresh();
+  }
+
+  // 1-Tap Mark All Active Medicines Taken for selected date
   async function handleMarkAllTaken() {
     const activeMeds = medicines.filter((m) => m.active);
     if (activeMeds.length === 0) return;
@@ -107,22 +155,26 @@ export function MedicineSchedule({
     const updated = new Map(pendingMarks);
     activeMeds.forEach((m) => updated.set(m.id, "taken"));
     setPendingMarks(updated);
-    setBulkSuccessMsg(`आज की सभी ${activeMeds.length} दवाइयाँ 'Taken' मार्क हो गईं!`);
+
+    setBulkSuccessMsg(`इस तारीख की सभी ${activeMeds.length} दवाइयाँ 'Taken' मार्क हो गईं!`);
     setTimeout(() => setBulkSuccessMsg(null), 4000);
 
     try {
       await Promise.all(
-        activeMeds.map((m) =>
-          logMedicineStatus({
+        activeMeds.map((m) => {
+          const targetTime = `${selectedDate}T${m.scheduled_time}`;
+          return logMedicineStatus({
             medicine_id: m.id,
             patient_id: patientId,
-            scheduled_time: new Date().toISOString(),
-            taken_time: new Date().toISOString(),
+            scheduled_time: targetTime,
+            taken_time: targetTime,
             status: "taken",
             notes: "1-Tap Mark All Taken",
-          })
-        )
+          });
+        })
       );
+      const updated = await getMedicineLogsByDate(patientId, selectedDate);
+      setCurrentLogs(updated);
       onRefresh();
     } catch {
       setPendingMarks(previousPending);
@@ -133,10 +185,14 @@ export function MedicineSchedule({
   }
 
   const activeMedsCount = medicines.filter((m) => m.active).length;
+  const takenCount = medicines.filter(
+    (m) => m.active && statusMap.get(m.id) === "taken"
+  ).length;
 
   return (
-    <Card className="border-slate-200/90 shadow-md">
-      <CardHeader className="p-4 sm:p-6">
+    <Card className="border-2 border-slate-200/90 shadow-md">
+      {/* HEADER & DATE NAVIGATOR */}
+      <CardHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
             <CardTitle className="text-xl sm:text-2xl font-black text-slate-900">
@@ -147,7 +203,7 @@ export function MedicineSchedule({
             </Badge>
           </div>
           <CardDescription className="text-sm font-medium text-slate-600 mt-1">
-            दिन के समय के अनुसार दवाइयों की सूची और खुराक
+            दिन के समय के अनुसार दवाइयों की सूची, खुराक और पिछली तारीखों की एंट्री बदलें
           </CardDescription>
         </div>
         <Button variant="primary" onClick={onAddMedicine} className="h-10 px-4 text-sm font-bold shadow-xs">
@@ -156,38 +212,87 @@ export function MedicineSchedule({
         </Button>
       </CardHeader>
 
+      {/* DATE NAVIGATION BAR */}
+      <div className="bg-slate-50 border-b border-slate-200 px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => adjustDate(-1)}
+            className="p-2 h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center cursor-pointer shadow-2xs active:scale-95"
+            title="पिछला दिन"
+          >
+            <ChevronLeft className="h-4 w-4 text-slate-700" />
+          </button>
+
+          <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs sm:text-base px-2 py-1 bg-white rounded-xl border border-slate-200 shadow-2xs">
+            <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>
+              {selectedDate === todayStr
+                ? `आज (Today · ${selectedDate})`
+                : selectedDate === "2026-08-26"
+                ? `26 Aug 2026 (कल · 13/13 Taken ✓)`
+                : selectedDate}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => adjustDate(1)}
+            className="p-2 h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center cursor-pointer shadow-2xs active:scale-95"
+            title="अगला दिन"
+          >
+            <ChevronRight className="h-4 w-4 text-slate-700" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs sm:text-sm font-black text-slate-700 bg-white px-3 py-1 rounded-xl border border-slate-200 shadow-2xs">
+            {takenCount} / {activeMedsCount} दवाइयाँ ली गईं (Taken)
+          </span>
+          {selectedDate !== todayStr && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr)}
+              className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+            >
+              आज पर जाएं
+            </button>
+          )}
+        </div>
+      </div>
+
       {rollbackError && (
-        <div className="mx-4 sm:mx-6 mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs sm:text-sm font-bold text-rose-800 animate-in fade-in">
+        <div className="mx-4 sm:mx-6 mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs sm:text-sm font-bold text-rose-800 animate-in fade-in">
           ⚠️ {rollbackError}
         </div>
       )}
 
       {bulkSuccessMsg && (
-        <div className="mx-4 sm:mx-6 mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs sm:text-sm font-bold text-emerald-800 animate-in fade-in">
-          ✓ {bulkSuccessMsg}
+        <div className="mx-4 sm:mx-6 mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs sm:text-sm font-bold text-emerald-800 animate-in fade-in">
+          {bulkSuccessMsg}
         </div>
       )}
 
-      <div className="p-4 sm:p-6 pt-0 space-y-6">
-        {/* 1-TAP BULK MARK ALL TODAY'S MEDICINES TAKEN */}
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* 1-TAP BULK MARK ALL MEDICINES TAKEN */}
         {activeMedsCount > 0 && (
           <div className="rounded-2xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-3.5 sm:p-4.5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
             <div>
               <p className="text-sm sm:text-base font-black text-emerald-950 flex items-center gap-1.5">
                 <CheckCheck className="h-4.5 w-4.5 text-emerald-600" />
-                <span>आसान 1-टैप मार्क (Easiest Medicine Tracker):</span>
+                <span>आसान 1-टैप मार्क ({selectedDate}):</span>
               </p>
               <p className="text-xs font-semibold text-emerald-800 mt-0.5">
-                आज की सभी {activeMedsCount} दवाइयाँ एक साथ ली गईं मार्क करें
+                इस तारीख की सभी {activeMedsCount} दवाइयाँ एक साथ ली गईं दर्ज करें
               </p>
             </div>
             <button
               type="button"
               onClick={handleMarkAllTaken}
-              className="w-full sm:w-auto min-h-11 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+              className="w-full sm:w-auto min-h-11 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
             >
               <CheckCheck className="h-4 w-4" />
-              ✓ आज की सभी दवाइयाँ ले लीं (Mark All Taken)
+              ✓ सभी दवाइयाँ ली गईं (Mark All Taken)
             </button>
           </div>
         )}
@@ -241,6 +346,17 @@ export function MedicineSchedule({
                               <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg shadow-2xs">
                                 {medicine.dose}
                               </span>
+                              {currentStatus !== "pending" && (
+                                <span className={`text-[11px] font-black px-2 py-0.5 rounded-md ${
+                                  currentStatus === "taken"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : currentStatus === "late"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-rose-100 text-rose-800"
+                                }`}>
+                                  स्थिति: {currentStatus.toUpperCase()}
+                                </span>
+                              )}
                             </div>
                             <p className="text-sm sm:text-base font-bold text-slate-700 flex items-center gap-1.5">
                               <span className="text-emerald-700">●</span>
@@ -251,7 +367,7 @@ export function MedicineSchedule({
                           </div>
 
                           <div className="flex items-center gap-2 self-start shrink-0">
-                            {/* EDIT MEDICINE BUTTON */}
+                            {/* EDIT MEDICINE DETAILS BUTTON */}
                             <button
                               type="button"
                               onClick={() => setMedicineToEdit(medicine)}
@@ -259,7 +375,7 @@ export function MedicineSchedule({
                               title="दवाई का नाम, खुराक या समय बदलें"
                             >
                               <Edit3 className="h-3.5 w-3.5 text-slate-600" />
-                              <span>Edit (संपादित करें)</span>
+                              <span>Edit (विवरण बदलें)</span>
                             </button>
 
                             <div className="flex items-center gap-1.5 text-sm font-black text-slate-900 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
@@ -271,13 +387,27 @@ export function MedicineSchedule({
 
                         {medicine.active && (
                           <div className="mt-4 pt-3 border-t border-slate-100">
-                            <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500 mb-2">
-                              आज की स्थिति दर्ज करें (Mark Today&apos;s Status):
-                            </p>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500">
+                                स्थिति बदलें / दर्ज करें (Change Entry):
+                              </p>
+                              {currentStatus !== "pending" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnmark(medicine)}
+                                  className="text-[11px] font-bold text-slate-400 hover:text-rose-600 flex items-center gap-1 cursor-pointer"
+                                  title="एंट्री हटाएं / रीसेट करें"
+                                >
+                                  <RotateCcw className="h-3 w-3" />
+                                  <span>Unmark (रीसेट)</span>
+                                </button>
+                              )}
+                            </div>
+
                             <div className="grid grid-cols-3 gap-2 sm:gap-3">
                               <button
                                 type="button"
-                                onClick={() => handleMark(medicine.id, "taken")}
+                                onClick={() => handleMark(medicine, "taken")}
                                 className={cn(
                                   "min-h-12 rounded-xl border-2 px-3 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98",
                                   currentStatus === "taken"
@@ -290,7 +420,7 @@ export function MedicineSchedule({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleMark(medicine.id, "late")}
+                                onClick={() => handleMark(medicine, "late")}
                                 className={cn(
                                   "min-h-12 rounded-xl border-2 px-3 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98",
                                   currentStatus === "late"
@@ -303,7 +433,7 @@ export function MedicineSchedule({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleMark(medicine.id, "missed")}
+                                onClick={() => handleMark(medicine, "missed")}
                                 className={cn(
                                   "min-h-12 rounded-xl border-2 px-3 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98",
                                   currentStatus === "missed"

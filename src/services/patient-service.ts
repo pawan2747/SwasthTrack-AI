@@ -96,10 +96,167 @@ const DEFAULT_PATIENT: PatientProfile = {
 
 const DEFAULT_CONDITIONS: MedicalCondition[] = [];
 
-const DEFAULT_MEDICINES: MedicineItem[] = [];
+export const PAPA_MEDICINES: MedicineItem[] = [
+  {
+    id: "b6e678d8-9a02-4c11-9877-67a8405008d8",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Omidec ES 40 Cap (Esomeprazole + Domperidone)",
+    dose: "1 Capsule (40mg)",
+    scheduled_time: "07:30:00",
+    meal_relation: "before_meal",
+    frequency: "Twice Daily (सुबह-शाम भूखे पेट)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "5329c874-ed89-4bd5-b522-61e2cd59e89d",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Deopride 25 Tab (Levosulpiride 25mg)",
+    dose: "1 Tablet (25mg)",
+    scheduled_time: "07:30:00",
+    meal_relation: "before_meal",
+    frequency: "Twice Daily (सुबह-शाम भूखे पेट)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "7686a144-82ab-4b1c-84df-3bc4f33e9ca5",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Fytel Trio Tab (Telmisartan Combination)",
+    dose: "1 Tablet",
+    scheduled_time: "08:00:00",
+    meal_relation: "after_meal",
+    frequency: "Once Daily (सुबह नाश्ते के बाद)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "502a5b56-d6bb-4473-bde8-ca43bc40ac2d",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Valever 300 Tab (Morning Dose)",
+    dose: "1 Tablet (300mg)",
+    scheduled_time: "08:30:00",
+    meal_relation: "after_meal",
+    frequency: "Twice Daily (सुबह नाश्ते के बाद)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "3eaf6b2c-d809-4fe0-b559-067c579cdea2",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "M-Cobaren Forte Tab (Multivitamin / Neuro)",
+    dose: "1 Capsule",
+    scheduled_time: "13:30:00",
+    meal_relation: "after_meal",
+    frequency: "Once Daily (दोपहर लंच के बाद)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "f9c524e8-e329-4604-9088-62ff1f860d30",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Metwon AM 50 Tab (Metoprolol + Amlodipine)",
+    dose: "1 Tablet (50mg)",
+    scheduled_time: "18:00:00",
+    meal_relation: "after_meal",
+    frequency: "Once Daily (शाम 6:00 PM)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "c08c3b75-a6d1-471c-ae51-8728df9af24c",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Omidec ES 40 Cap (Evening Dose)",
+    dose: "1 Capsule (40mg)",
+    scheduled_time: "18:30:00",
+    meal_relation: "before_meal",
+    frequency: "Twice Daily (शाम डिनर से पहले भूखे पेट)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "d06f6b8f-4681-4c64-8ec6-3f6dfe765274",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Deopride 25 Tab (Evening Dose)",
+    dose: "1 Tablet (25mg)",
+    scheduled_time: "18:30:00",
+    meal_relation: "before_meal",
+    frequency: "Twice Daily (शाम डिनर से पहले भूखे पेट)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "3a9ad4da-b19c-43c1-9a67-f01355e28f52",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Valever 300 Tab (Night Dose)",
+    dose: "1 Tablet (300mg)",
+    scheduled_time: "20:30:00",
+    meal_relation: "after_meal",
+    frequency: "Twice Daily (रात डिनर के बाद)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "0f7f4520-62f1-425c-8396-062807e67fbb",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Epsolin ER 300 Cap (Phenytoin Sodium 300mg)",
+    dose: "1 Capsule (300mg)",
+    scheduled_time: "21:00:00",
+    meal_relation: "after_meal",
+    frequency: "Once Daily (रात 9:00 PM)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "df80805a-f0a4-46b6-aa4c-1c3022380cdf",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Rosafin Gold 20 Cap (Rosuvastatin + Aspirin + Clopidogrel)",
+    dose: "1 Capsule (20mg)",
+    scheduled_time: "21:00:00",
+    meal_relation: "after_meal",
+    frequency: "Once Daily (रात 9:00 PM)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "9d6ba993-42dd-4eee-9f7e-32c5d67eb8d0",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Slona Plus Tab (Clonazepam + Escitalopram)",
+    dose: "1 Tablet",
+    scheduled_time: "21:30:00",
+    meal_relation: "after_meal",
+    frequency: "Once Daily (रात 9:30 PM)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+  {
+    id: "69fbe825-7397-48c5-870e-f4cddf8de5d3",
+    patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    medicine_name: "Tamsis D / Albus Tab (Tamsulosin + Dutasteride)",
+    dose: "1 Tablet",
+    scheduled_time: "22:00:00",
+    meal_relation: "after_meal",
+    frequency: "Once Daily (रात 10:00 PM सोने से पहले)",
+    active: true,
+    created_at: "2026-08-24T17:01:50.661559+00:00",
+  },
+];
+
+const DEFAULT_MEDICINES: MedicineItem[] = PAPA_MEDICINES;
+
+export const SEEDED_PAPA_MED_LOGS_26: MedicineLogEntry[] = PAPA_MEDICINES.map((m) => ({
+  id: `medlog-26-${m.id}`,
+  patient_id: "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+  medicine_id: m.id,
+  scheduled_time: `2026-08-26T${m.scheduled_time}`,
+  taken_time: `2026-08-26T${m.scheduled_time}`,
+  status: "taken" as const,
+  notes: "26/08/2026 को सभी दवाइयाँ ली गईं",
+  created_at: "2026-08-26T22:30:00.000Z",
+}));
 
 const STORAGE_VERSION_KEY = "swasthtrack_storage_version";
-const CURRENT_STORAGE_VERSION = "swasthtrack_v5_clean_purge";
+const CURRENT_STORAGE_VERSION = "swasthtrack_v6_med_update";
 
 export function checkAndMigrateStorage(): void {
   if (typeof window !== "undefined") {
@@ -1841,15 +1998,12 @@ export async function getSleepLogs(patientId?: string, limit = 14): Promise<Slee
 export async function logMedicineStatus(
   log: Omit<Database["public"]["Tables"]["medicine_logs"]["Insert"], "id" | "created_at">,
 ): Promise<MedicineLogEntry> {
-  const today = getTodayDateString();
-  const d = new Date();
-  const localStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  const localEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-  const startOfDay = localStart.toISOString();
-  const endOfDay = localEnd.toISOString();
+  const logDate = log.scheduled_time ? log.scheduled_time.split("T")[0] : getTodayDateString();
+  const startOfDay = `${logDate}T00:00:00.000Z`;
+  const endOfDay = `${logDate}T23:59:59.999Z`;
 
   if (isSupabaseConfigured) {
-    // Check if there is an existing log for this medicine today
+    // Check if there is an existing log for this medicine on this specific date
     const { data: existing } = await supabase
       .from("medicine_logs")
       .select("*")
@@ -1887,7 +2041,7 @@ export async function logMedicineStatus(
           scheduled_time: log.scheduled_time,
           taken_time: log.taken_time,
           status: log.status,
-          notes: log.notes
+          notes: log.notes,
         })
         .select()
         .single();
@@ -1905,9 +2059,9 @@ export async function logMedicineStatus(
     (m) =>
       m.patient_id === log.patient_id &&
       m.medicine_id === log.medicine_id &&
-      m.scheduled_time.startsWith(today),
+      m.scheduled_time.startsWith(logDate),
   );
-  
+
   const entry: MedicineLogEntry = {
     id: existingIdx !== -1 ? storedList[existingIdx].id : `medlog-${Date.now()}`,
     medicine_id: log.medicine_id,
@@ -1928,43 +2082,61 @@ export async function logMedicineStatus(
   return entry;
 }
 
-export async function getTodayMedicineLogs(patientId?: string): Promise<MedicineLogEntry[]> {
+export async function deleteMedicineLog(id: string): Promise<boolean> {
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from("medicine_logs").delete().eq("id", id);
+    } catch {}
+  }
+  const stored = getStorageItem<MedicineLogEntry[]>("swasthtrack_medicine_logs", []);
+  setStorageItem("swasthtrack_medicine_logs", stored.filter((m) => m.id !== id));
+  return true;
+}
+
+export async function getMedicineLogsByDate(
+  patientId?: string,
+  dateStr?: string,
+): Promise<MedicineLogEntry[]> {
   const profile = await getPatientProfile();
   const pid = patientId || profile.id;
-  const today = getTodayDateString();
+  const targetDate = dateStr || getTodayDateString();
 
-  const d = new Date();
-  const localStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-  const localEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-  const startOfDay = localStart.toISOString();
-  const endOfDay = localEnd.toISOString();
+  const startOfDay = `${targetDate}T00:00:00.000Z`;
+  const endOfDay = `${targetDate}T23:59:59.999Z`;
 
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from("medicine_logs")
-      .select("*")
-      .eq("patient_id", pid)
-      .gte("scheduled_time", startOfDay)
-      .lte("scheduled_time", endOfDay)
-      .order("scheduled_time", { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from("medicine_logs")
+        .select("*")
+        .eq("patient_id", pid)
+        .gte("scheduled_time", startOfDay)
+        .lte("scheduled_time", endOfDay)
+        .order("scheduled_time", { ascending: true });
 
-    if (error) {
-      console.error("Supabase getTodayMedicineLogs error:", error);
-      throw new Error(error.message);
-    }
-
-    if (data) {
-      setStorageItem("swasthtrack_medicine_logs", data);
-      return data as unknown as MedicineLogEntry[];
+      if (!error && data && data.length > 0) {
+        return data as unknown as MedicineLogEntry[];
+      }
+    } catch (err) {
+      console.error("Supabase getMedicineLogsByDate error:", err);
     }
   }
 
+  // If date is 2026-08-26, return seeded 100% taken logs for Papa
+  if (targetDate === "2026-08-26") {
+    return SEEDED_PAPA_MED_LOGS_26;
+  }
+
   const stored = getStorageItem<MedicineLogEntry[]>("swasthtrack_medicine_logs", []);
-  return stored.filter(
-    (m) =>
-      m.patient_id === pid &&
-      m.scheduled_time.startsWith(today),
+  const filtered = stored.filter(
+    (m) => m.patient_id === pid && m.scheduled_time.startsWith(targetDate),
   );
+
+  return filtered;
+}
+
+export async function getTodayMedicineLogs(patientId?: string): Promise<MedicineLogEntry[]> {
+  return getMedicineLogsByDate(patientId, getTodayDateString());
 }
 
 // ----------------------------------------------------

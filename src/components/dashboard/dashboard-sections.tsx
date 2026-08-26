@@ -23,6 +23,7 @@ import {
 import { ProgressBar } from "@/components/ui/progress-bar";
 import {
   logMedicineStatus,
+  deleteMedicineLog,
   toggleChecklistItem,
   type DashboardOverview,
   type MedicineItem,
@@ -71,6 +72,16 @@ export function DashboardSections({
       : 0;
 
   async function handleMarkMedicine(medicineId: string, status: "taken" | "late" | "missed") {
+    const todayLogs = data.todayMedicineLogs || [];
+    const logItem = todayLogs.find((l) => l.medicine_id === medicineId);
+
+    // If user taps the already active status, unmark/clear the entry
+    if (logItem && logItem.status === status) {
+      await deleteMedicineLog(logItem.id);
+      onRefresh();
+      return;
+    }
+
     await logMedicineStatus({
       medicine_id: medicineId,
       patient_id: patient.id,
