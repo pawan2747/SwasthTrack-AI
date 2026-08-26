@@ -5,7 +5,7 @@ import {
   getMedicines,
   getPatientProfile,
   getSleepLogs,
-  getTodayMedicineLogs,
+  getMedicineLogsByDate,
   getWeightLogs,
   isSameLocalDay,
 } from "./patient-service";
@@ -139,7 +139,7 @@ export async function calculateDailyWellnessScore(
   ] = await Promise.all([
     getPatientSettings(pid),
     getMedicines(pid),
-    getTodayMedicineLogs(pid),
+    getMedicineLogsByDate(pid, targetDateStr),
     getFoodLogsByDate(pid, targetDateStr),
     getActivityLogs(pid, 10),
     getSleepLogs(pid, 10),

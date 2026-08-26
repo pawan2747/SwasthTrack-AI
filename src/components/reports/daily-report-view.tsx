@@ -25,6 +25,7 @@ import {
   getTodayDateString,
   type FoodLogEntry,
 } from "@/services/patient-service";
+import { cn } from "@/lib/utils";
 
 type DailyReportViewProps = {
   patientId: string;
@@ -79,8 +80,31 @@ export function DailyReportView({ patientId }: DailyReportViewProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-slate-600">Select Date:</label>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedDate("2026-08-26")}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs",
+              selectedDate === "2026-08-26"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50",
+            )}
+          >
+            26 Aug 2026 (कल)
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDate(getTodayDateString())}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs",
+              selectedDate === getTodayDateString()
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50",
+            )}
+          >
+            आज (Today)
+          </button>
           <input
             type="date"
             value={selectedDate}
