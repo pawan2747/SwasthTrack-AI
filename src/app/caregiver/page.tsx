@@ -32,12 +32,15 @@ import {
   generateSmartInsightsAndAlerts,
   type SmartInsightsData,
 } from "@/services/smart-insights-service";
+import { getHealthChanges, type HealthChangesResult } from "@/services/what-changed-service";
+import Link from "next/link";
 
 export default function CaregiverPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [intelligence, setIntelligence] = useState<ComprehensiveIntelligence | null>(null);
   const [smartData, setSmartData] = useState<SmartInsightsData | null>(null);
+  const [healthChanges, setHealthChanges] = useState<HealthChangesResult | null>(null);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [isAddCaregiverOpen, setIsAddCaregiverOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,14 +53,16 @@ export default function CaregiverPage() {
         if (!active) return;
         setData(overview);
 
-        const [intel, smart] = await Promise.all([
+        const [intel, smart, changes] = await Promise.all([
           detectHealthAnomaliesAndTrends(overview.patient.id),
           generateSmartInsightsAndAlerts(overview.patient.id),
+          getHealthChanges(overview.patient.id, "7d"),
         ]);
 
         if (active) {
           setIntelligence(intel);
           setSmartData(smart);
+          setHealthChanges(changes);
           setLoading(false);
         }
       })
@@ -159,6 +164,31 @@ export default function CaregiverPage() {
           </div>
         </div>
       </Card>
+
+      {/* WHAT CHANGED FOR PAPA (PHASE 8A §28) */}
+      {healthChanges && healthChanges.dataSufficiency.isSufficient && (
+        <Card className="border-purple-200 bg-linear-to-r from-purple-50/60 via-white to-white p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-purple-100 text-purple-800 border border-purple-200">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                What Changed for Papa? · पापा के स्वास्थ्य में क्या बदलाव आए?
+              </h3>
+            </div>
+            <Link
+              href="/insights/changes"
+              className="text-xs font-bold text-purple-700 hover:text-purple-950 underline self-start sm:self-auto"
+            >
+              विस्तृत विश्लेषण देखें →
+            </Link>
+          </div>
+          <p className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed bg-white p-3 rounded-xl border border-purple-100/90 shadow-2xs">
+            {healthChanges.caregiverSummaryHi}
+          </p>
+        </Card>
+      )}
 
       {/* CRITICAL ATTENTION ITEMS (MEANINGFUL FILTERED ALERTS) */}
       <Card className="border-amber-200/80 bg-white p-5 shadow-xs">

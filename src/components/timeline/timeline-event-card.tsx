@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   Activity,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   HeartPulse,
@@ -24,8 +25,12 @@ const domainIcons: Record<TimelineDomain, typeof Activity> = {
   activity: Activity,
   sleep: Moon,
   weight: Scale,
+  wellness_score: CheckCircle2,
   insight: Sparkles,
   alert: Info,
+  progress_photo: Activity,
+  goal_change: Activity,
+  settings_change: Activity,
 };
 
 const domainStyles: Record<TimelineDomain, { iconBg: string; border: string; accent: string }> = {
@@ -59,6 +64,11 @@ const domainStyles: Record<TimelineDomain, { iconBg: string; border: string; acc
     border: "border-blue-200/80 hover:border-blue-300",
     accent: "bg-blue-500",
   },
+  wellness_score: {
+    iconBg: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    border: "border-emerald-200/80 hover:border-emerald-300",
+    accent: "bg-emerald-500",
+  },
   insight: {
     iconBg: "bg-indigo-100 text-indigo-800 border-indigo-200",
     border: "border-indigo-200/80 hover:border-indigo-300",
@@ -69,16 +79,43 @@ const domainStyles: Record<TimelineDomain, { iconBg: string; border: string; acc
     border: "border-rose-200/80 hover:border-rose-300",
     accent: "bg-rose-500",
   },
+  progress_photo: {
+    iconBg: "bg-slate-100 text-slate-800 border-slate-200",
+    border: "border-slate-200/80 hover:border-slate-300",
+    accent: "bg-slate-500",
+  },
+  goal_change: {
+    iconBg: "bg-sky-100 text-sky-800 border-sky-200",
+    border: "border-sky-200/80 hover:border-sky-300",
+    accent: "bg-sky-500",
+  },
+  settings_change: {
+    iconBg: "bg-slate-100 text-slate-800 border-slate-200",
+    border: "border-slate-200/80 hover:border-slate-300",
+    accent: "bg-slate-500",
+  },
 };
 
-export function TimelineEventCard({ event }: { event: TimelineEvent }) {
+export function TimelineEventCard({
+  event,
+  onSelect,
+}: {
+  event: TimelineEvent;
+  onSelect?: (event: TimelineEvent) => void;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const Icon = domainIcons[event.domain] || Activity;
   const style = domainStyles[event.domain] || domainStyles.activity;
 
   return (
     <div
-      onClick={() => setIsExpanded(!isExpanded)}
+      onClick={() => {
+        if (onSelect) {
+          onSelect(event);
+        } else {
+          setIsExpanded(!isExpanded);
+        }
+      }}
       className={cn(
         "rounded-2xl border-2 bg-white p-3.5 sm:p-4 shadow-sm transition-all duration-150 cursor-pointer select-none",
         "active:scale-[0.985] active:translate-y-0.5 hover:shadow-md",

@@ -40,9 +40,9 @@ export default function TimelinePage() {
   return (
     <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       <PageTitle
-        eyebrow="My Health Journey · स्वास्थ्य यात्रा"
-        title="Health Timeline"
-        description="A unified chronological journey of your vitals, nutrition, medicine doses, and daily activities."
+        eyebrow="Timeline · एकीकृत स्वास्थ्य यात्रा"
+        title="मेरी स्वास्थ्य यात्रा"
+        description="आपके स्वास्थ्य से जुड़े महत्वपूर्ण रिकॉर्ड एक जगह — भोजन, रक्तचाप, दवाइयाँ, कदम, नींद और वाइटल्स का एकीकृत क्रोनोलॉजिकल प्रवाह।"
       />
       <TimelineView patientId={patient.id} />
     </div>
