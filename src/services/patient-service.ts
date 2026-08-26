@@ -2268,9 +2268,9 @@ export interface DashboardOverview {
   isRealDatabaseConnected: boolean;
 }
 
-export async function getDashboardOverview(): Promise<DashboardOverview> {
-  const profile = await getPatientProfile();
-  const pid = profile.id;
+export async function getDashboardOverview(patientId?: string): Promise<DashboardOverview> {
+  const profile = await getPatientProfile(patientId);
+  const pid = patientId || profile.id;
   const today = getTodayDateString();
 
   const [conditions, medicines, bpList, weightList, foodList, actList, medLogs, checklist] =

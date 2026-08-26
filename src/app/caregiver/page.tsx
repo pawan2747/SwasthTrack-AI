@@ -33,11 +33,16 @@ import {
   type SmartInsightsData,
 } from "@/services/smart-insights-service";
 import { getHealthChanges, type HealthChangesResult } from "@/services/what-changed-service";
+import { CaregiverHeroBrief } from "@/components/caregiver/caregiver-hero-brief";
+import { getAuthorizedPatients } from "@/services/auth-service";
+import type { PatientProfile } from "@/services/patient-service";
 import Link from "next/link";
 
 export default function CaregiverPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DashboardOverview | null>(null);
+  const [authorizedPatients, setAuthorizedPatients] = useState<PatientProfile[]>([]);
+  const [activePatientId, setActivePatientId] = useState<string | undefined>(undefined);
   const [intelligence, setIntelligence] = useState<ComprehensiveIntelligence | null>(null);
   const [smartData, setSmartData] = useState<SmartInsightsData | null>(null);
   const [healthChanges, setHealthChanges] = useState<HealthChangesResult | null>(null);
@@ -48,10 +53,14 @@ export default function CaregiverPage() {
   useEffect(() => {
     let active = true;
 
-    getDashboardOverview()
-      .then(async (overview) => {
+    Promise.all([
+      getDashboardOverview(activePatientId),
+      getAuthorizedPatients().catch(() => [] as PatientProfile[]),
+    ])
+      .then(async ([overview, authPts]) => {
         if (!active) return;
         setData(overview);
+        setAuthorizedPatients(authPts);
 
         const [intel, smart, changes] = await Promise.all([
           detectHealthAnomaliesAndTrends(overview.patient.id),
@@ -74,7 +83,7 @@ export default function CaregiverPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [activePatientId]);
 
   function handlePrint() {
     if (typeof window !== "undefined") {
@@ -127,6 +136,16 @@ export default function CaregiverPage() {
           </Button>
         </div>
       </div>
+
+      {/* CAREGIVER HERO BRIEF: "PAPA AAJ KAISE RAHE?" (§2) */}
+      <CaregiverHeroBrief
+        patient={patient}
+        authorizedPatients={authorizedPatients}
+        onSelectPatient={(pid) => {
+          setLoading(true);
+          setActivePatientId(pid);
+        }}
+      />
 
       {/* PATIENT HEADER BANNER */}
       <Card className="border-emerald-200 bg-linear-to-r from-emerald-500/10 via-emerald-50 to-white p-5">
