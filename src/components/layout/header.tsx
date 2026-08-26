@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays,
+  History,
   Settings,
   UserCheck,
   UserCircle,
@@ -45,6 +46,18 @@ export function Header() {
 
         {/* Right: Quick Action Icons (Caregiver, Settings, Profile) */}
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/timeline"
+            title="स्वास्थ्य यात्रा (Timeline)"
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+              pathname === "/timeline"
+                ? "border-emerald-600 bg-emerald-100 text-emerald-900 shadow-2xs"
+                : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            <History className="h-4.5 w-4.5" />
+          </Link>
+
           <Link
             href="/caregiver"
             title="Caregiver"
@@ -103,6 +116,18 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/timeline"
+            className={`flex min-h-10 items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              pathname === "/timeline"
+                ? "border-emerald-600 bg-emerald-100 text-emerald-900 shadow-2xs"
+                : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+            }`}
+          >
+            <History className="h-4 w-4 text-emerald-600" />
+            <span>Timeline (यात्रा)</span>
+          </Link>
+
           <div className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
             <CalendarDays aria-hidden className="h-4 w-4 text-emerald-600" />
             <CurrentDate />

@@ -6,6 +6,9 @@ import { SkeletonDashboard } from "@/components/ui/skeleton-loaders";
 import { DashboardSections } from "@/components/dashboard/dashboard-sections";
 import { PatientOverviewCard } from "@/components/dashboard/patient-overview-card";
 import { PapaGreetingBanner } from "@/components/dashboard/papa-greeting-banner";
+import { HeroHealthCard } from "@/components/dashboard/hero-health-card";
+import { DailyStoryCard } from "@/components/dashboard/daily-story-card";
+import { WhatChangedCard } from "@/components/dashboard/what-changed-card";
 import { QuickActionsBar } from "@/components/dashboard/quick-actions-bar";
 import { TodaySummaryGrid } from "@/components/dashboard/today-summary-grid";
 import { WellnessScoreCard } from "@/components/dashboard/wellness-score-card";
@@ -153,16 +156,21 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      {/* 1. WARM PERSONAL LOVE GREETING FOR PAPA (§26 #1) */}
+      {/* 1. WARM PERSONAL LOVE GREETING FOR PAPA */}
       <PapaGreetingBanner patient={data.patient} />
 
-      {/* 2. TODAY'S WELLNESS & TRACKING SCORE (§26 #2) */}
-      <WellnessScoreCard
-        patientId={data.patient.id}
-        onRefresh={loadData}
+      {/* 2. FEATURED 3D HERO HEALTH CARD */}
+      <HeroHealthCard
+        data={data}
+        onOpenBP={() => setIsBPOpen(true)}
+        onOpenWeight={() => setIsWeightOpen(true)}
+        onOpenFood={() => setIsFoodOpen(true)}
+        onOpenActivity={() => setIsActivityOpen(true)}
+        onOpenMedicine={() => setIsMedicineOpen(true)}
+        onOpenSleep={() => setIsSleepOpen(true)}
       />
 
-      {/* 3. NEEDS ATTENTION / ACTIVE HEALTH ALERTS (§26 #3) */}
+      {/* 3. NEEDS ATTENTION / ACTIVE HEALTH ALERTS */}
       {smartData?.alerts && smartData.alerts.length > 0 && (
         <AlertCenterCard
           alerts={smartData.alerts}
@@ -170,7 +178,7 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* 4. QUICK LOG: 'आज क्या दर्ज करना है?' (§26 #4, §27) */}
+      {/* 4. TACTILE 3D QUICK ACTIONS */}
       <QuickActionsBar
         onOpenBP={() => setIsBPOpen(true)}
         onOpenWeight={() => setIsWeightOpen(true)}
@@ -178,6 +186,18 @@ export default function DashboardPage() {
         onOpenActivity={() => setIsActivityOpen(true)}
         onOpenSleep={() => setIsSleepOpen(true)}
         onOpenMedicine={() => setIsMedicineOpen(true)}
+      />
+
+      {/* 5. NARRATIVE DAILY STORY: MORNING, AFTERNOON, EVENING, NIGHT */}
+      <DailyStoryCard data={data} />
+
+      {/* 6. 'WHAT CHANGED?' (पिछले कुछ दिनों में क्या बदला?) INTELLIGENCE */}
+      <WhatChangedCard patientId={data.patient.id} />
+
+      {/* 7. TODAY'S WELLNESS & ROUTINE TRACKING BREAKDOWN */}
+      <WellnessScoreCard
+        patientId={data.patient.id}
+        onRefresh={loadData}
       />
 
       {/* 5. TODAY'S HEALTH / METRIC SUMMARY (§26 #5) */}
