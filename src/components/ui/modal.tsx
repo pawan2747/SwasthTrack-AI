@@ -56,7 +56,7 @@ export function Modal({
       />
       <div
         className={cn(
-          "relative z-10 w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl transition-all sm:p-7 max-h-[90vh] overflow-y-auto",
+          "relative z-10 w-full rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xl transition-all max-h-[90vh] overflow-y-auto",
           maxWidthClasses[maxWidth],
         )}
       >

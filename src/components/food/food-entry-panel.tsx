@@ -12,6 +12,9 @@ import {
   ExternalLink,
   ChevronRight,
   X,
+  Bookmark,
+  BookmarkPlus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,6 +36,12 @@ import {
   hideQuickFood,
   type PersonalizedQuickFoodItem,
 } from "@/services/quick-food-service";
+import {
+  getSavedFoods,
+  saveCustomFoodAsMyFood,
+  removeSavedFood,
+  type SavedFoodItem,
+} from "@/services/saved-food-service";
 import { getExactFoodEmoji } from "@/lib/utils";
 
 type FoodEntryPanelProps = {
@@ -84,8 +93,11 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
   const [customSourceWebsite, setCustomSourceWebsite] = useState("");
   const [customProtein, setCustomProtein] = useState("");
 
-  // Favorites
+  // Favorites & Saved Foods (My Foods)
   const [favorites, setFavorites] = useState<FoodItem[]>([]);
+  const [savedFoods, setSavedFoods] = useState<SavedFoodItem[]>(() =>
+    patientId ? getSavedFoods(patientId) : []
+  );
 
   // UI Status
   const [loading, setLoading] = useState(false);
@@ -99,6 +111,10 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
 
   const fetchFavorites = useCallback(() => {
     getFavorites(patientId).then(setFavorites);
+  }, [patientId]);
+
+  const loadSavedFoodsList = useCallback(() => {
+    setSavedFoods(getSavedFoods(patientId));
   }, [patientId]);
 
   const loadPersonalizedQuickFoods = useCallback(() => {
@@ -115,6 +131,9 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
 
   useEffect(() => {
     fetchFavorites();
+    setTimeout(() => {
+      loadSavedFoodsList();
+    }, 0);
     loadPersonalizedQuickFoods();
     // Load search history from localStorage
     if (typeof window !== "undefined") {
@@ -127,7 +146,7 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
         }
       } catch {}
     }
-  }, [fetchFavorites, loadPersonalizedQuickFoods]);
+  }, [fetchFavorites, loadSavedFoodsList, loadPersonalizedQuickFoods]);
 
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -570,6 +589,70 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
               </div>
             )}
 
+            {/* 2.5 SAVED FOODS SECTION (Your Foods / My Foods) */}
+            {savedFoods.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-sm font-black text-indigo-950">
+                    <Bookmark className="h-4 w-4 text-indigo-600" />
+                    <span>आपके सेव किए गए भोजन (Your Saved Foods)</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">1-टैप में लोड करें</span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {savedFoods.map((s) => (
+                    <div
+                      key={s.id}
+                      onClick={() => {
+                        setSelectedFood({
+                          id: s.id,
+                          name: s.name,
+                          name_hi: null,
+                          category: "indian_preparation",
+                          subcategory: null,
+                          reference_weight_g: 100,
+                          reference_unit: s.default_unit || "serving",
+                          calories_per_100g: s.default_calories,
+                          protein_g_100g: s.default_protein || 0,
+                          carbs_g_100g: 0,
+                          fat_g_100g: 0,
+                          fibre_g_100g: 0,
+                          sodium_mg_100g: null,
+                          source_type: "user_entered",
+                          source_name: "Saved Food",
+                          source_note: null,
+                          is_verified: true,
+                          is_custom: true,
+                          is_active: true,
+                          created_at: s.created_at,
+                          updated_at: s.updated_at,
+                        });
+                        setQuantity(String(s.default_quantity || 1));
+                      }}
+                      className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl border-2 border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-950 font-bold text-xs transition-all cursor-pointer shadow-2xs"
+                    >
+                      <span>{getExactFoodEmoji(s.name)}</span>
+                      <span>{s.name}</span>
+                      <span className="text-[10px] text-indigo-700 font-semibold">({s.default_calories} kcal)</span>
+                      <button
+                        type="button"
+                        title="Remove from Saved Foods (इतिहास सुरक्षित रहेगा)"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeSavedFood(patientId, s.id);
+                          loadSavedFoodsList();
+                        }}
+                        className="ml-1 text-indigo-400 hover:text-rose-600 p-0.5 rounded-sm"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 3. PROMINENT PERSONALIZED QUICK FOODS SECTION */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -920,7 +1003,7 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
               />
             </Field>
 
-            <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-slate-200 pt-4">
               <Button
                 type="button"
                 variant="ghost"
@@ -932,12 +1015,35 @@ export function FoodEntryPanel({ patientId, onSuccess }: FoodEntryPanelProps) {
               >
                 Cancel
               </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!customName.trim()) return;
+                  saveCustomFoodAsMyFood(patientId, {
+                    name: customName.trim(),
+                    calories: parseFloat(customCalories) || 150,
+                    quantity: parseFloat(customWeightG) || 100,
+                    unit: customUnit || "g",
+                    protein: parseFloat(customProtein) || 0,
+                    meal_context: mealType,
+                  });
+                  loadSavedFoodsList();
+                  setSuccessMsg(`"${customName}" को "Your Foods" में सेव कर लिया गया है!`);
+                  setShowCustomForm(false);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-indigo-300 bg-indigo-50 text-indigo-950 font-bold text-xs sm:text-sm hover:bg-indigo-100 transition-colors cursor-pointer"
+              >
+                <BookmarkPlus className="h-4 w-4 text-indigo-600" />
+                Save as My Food (भविष्य के लिए रखें)
+              </button>
+
               <Button
                 type="submit"
                 variant="primary"
                 disabled={loading}
               >
-                {loading ? "सहेज रहा है..." : "Save Custom Food (डेटाबेस में सुरक्षित करें)"}
+                {loading ? "सहेज रहा है..." : "Log to Meal (अभी दर्ज करें)"}
               </Button>
             </div>
           </form>

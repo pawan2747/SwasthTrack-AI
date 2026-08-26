@@ -176,10 +176,24 @@ export function ActivityPanel({
                             </Badge>
                           </div>
 
-                          <div className="text-xs text-slate-500 font-medium mt-0.5 space-x-2">
-                            <span>📍 दूरी: {log.distance_km || 0} km</span>
-                            <span>⏱️ समय: {log.walking_minutes || 0} min</span>
-                            <span>🔥 बर्न: ~{log.estimated_calories_burned || 0} kcal</span>
+                          <div className="text-xs text-slate-500 font-medium mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            {log.distance_km && log.distance_km > 0 ? (
+                              <span>📍 दूरी: {log.distance_km} km</span>
+                            ) : null}
+                            <span>
+                              ⏱️ समय: {log.walking_minutes && log.walking_minutes > 0 ? (
+                                <strong className="text-slate-800 font-bold">{log.walking_minutes} min (दर्ज)</strong>
+                              ) : (
+                                <span className="text-slate-400">~{Math.round(log.steps / 125)}–{Math.round(log.steps / 95)} min (अनुमानित)</span>
+                              )}
+                            </span>
+                            <span>
+                              🔥 सक्रिय बर्न: {log.estimated_calories_burned && log.estimated_calories_burned > 0 ? (
+                                <strong className="text-amber-800 font-bold">{log.estimated_calories_burned} kcal</strong>
+                              ) : (
+                                <span className="text-slate-400">उपलब्ध नहीं</span>
+                              )}
+                            </span>
                           </div>
                         </div>
                       </div>

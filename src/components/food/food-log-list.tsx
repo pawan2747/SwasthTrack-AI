@@ -181,27 +181,27 @@ export function FoodLogList({
   return (
     <Card className="border-slate-200">
       {/* Date Navigation Bar */}
-      <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+      <div className="bg-slate-50 border-b border-slate-200 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <Button
             type="button"
             variant="ghost"
             onClick={() => adjustDate(-1)}
-            className="p-2 h-9 w-9 rounded-lg"
+            className="p-2 h-8 w-8 sm:h-9 sm:w-9 rounded-lg shrink-0"
           >
-            <ChevronLeft className="h-5 w-5 text-slate-600" />
+            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600" />
           </Button>
-          <div className="flex items-center gap-2 font-bold text-slate-800 text-base min-w-36 text-center justify-center">
-            <Calendar className="h-4.5 w-4.5 text-emerald-600" />
-            <span>{selectedDate === new Date().toISOString().split("T")[0] ? "आज (Today)" : selectedDate}</span>
+          <div className="flex items-center gap-1.5 font-bold text-slate-800 text-xs sm:text-base min-w-0 text-center justify-center">
+            <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span className="truncate">{selectedDate === new Date().toISOString().split("T")[0] ? "आज (Today)" : selectedDate}</span>
           </div>
           <Button
             type="button"
             variant="ghost"
             onClick={() => adjustDate(1)}
-            className="p-2 h-9 w-9 rounded-lg"
+            className="p-2 h-8 w-8 sm:h-9 sm:w-9 rounded-lg shrink-0"
           >
-            <ChevronRight className="h-5 w-5 text-slate-600" />
+            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600" />
           </Button>
         </div>
 

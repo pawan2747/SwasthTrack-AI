@@ -153,17 +153,24 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      {/* WARM PERSONAL LOVE GREETING FOR PAPA */}
+      {/* 1. WARM PERSONAL LOVE GREETING FOR PAPA (§26 #1) */}
       <PapaGreetingBanner patient={data.patient} />
 
-      {/* PATIENT OVERVIEW BANNER */}
-      <PatientOverviewCard
-        patient={data.patient}
-        conditions={data.conditions}
-        onEditProfile={() => setIsEditProfileOpen(true)}
+      {/* 2. TODAY'S WELLNESS & TRACKING SCORE (§26 #2) */}
+      <WellnessScoreCard
+        patientId={data.patient.id}
+        onRefresh={loadData}
       />
 
-      {/* PROMINENT TOP 1-TAP DAILY TRACKER FOR PAPA */}
+      {/* 3. NEEDS ATTENTION / ACTIVE HEALTH ALERTS (§26 #3) */}
+      {smartData?.alerts && smartData.alerts.length > 0 && (
+        <AlertCenterCard
+          alerts={smartData.alerts}
+          onAlertChange={loadData}
+        />
+      )}
+
+      {/* 4. QUICK LOG: 'आज क्या दर्ज करना है?' (§26 #4, §27) */}
       <QuickActionsBar
         onOpenBP={() => setIsBPOpen(true)}
         onOpenWeight={() => setIsWeightOpen(true)}
@@ -173,47 +180,10 @@ export default function DashboardPage() {
         onOpenMedicine={() => setIsMedicineOpen(true)}
       />
 
-      {/* TODAY'S WELLNESS & TRACKING SCORE */}
-      <WellnessScoreCard
-        patientId={data.patient.id}
-        onRefresh={loadData}
-      />
-
-      {/* ACTIVE HEALTH ALERTS */}
-      {smartData?.alerts && smartData.alerts.length > 0 && (
-        <AlertCenterCard
-          alerts={smartData.alerts}
-          onAlertChange={loadData}
-        />
-      )}
-
-      {/* SMART DAILY SUMMARY */}
-      {smartData?.dailySummary && (
-        <SmartDailySummaryCard summary={smartData.dailySummary} />
-      )}
-
-      {/* PERSONAL HEALTH PATTERN */}
-      {intelligence && intelligence.healthPatternBullets.length > 0 && (
-        <PersonalHealthPatternCard
-          patientId={data.patient.id}
-          bullets={intelligence.healthPatternBullets}
-          multiFactorObservations={intelligence.multiFactorInsights}
-        />
-      )}
-
-      {/* HEALTH TREND FORECAST (ML) */}
-      {predictions.length > 0 && (
-        <HealthForecastCard
-          predictions={predictions}
-          modelVersion={modelVersion}
-          onOpenDiagnostics={isAdmin ? () => setIsDiagnosticsOpen(true) : undefined}
-        />
-      )}
-
-      {/* TODAY'S METRIC SUMMARY */}
+      {/* 5. TODAY'S HEALTH / METRIC SUMMARY (§26 #5) */}
       <TodaySummaryGrid data={data} />
 
-      {/* SECTIONS & HABITS */}
+      {/* 6. FOOD, BP, MEDICINE, ACTIVITY, SLEEP SECTIONS (§26 #6-10) */}
       <DashboardSections
         data={data}
         onRefresh={loadData}
@@ -222,6 +192,34 @@ export default function DashboardPage() {
         onOpenFood={() => setIsFoodOpen(true)}
         onOpenActivity={() => setIsActivityOpen(true)}
         onOpenMedicine={() => setIsMedicineOpen(true)}
+      />
+
+      {/* 7. TRENDS & INTELLIGENCE (§26 #11-12) */}
+      {smartData?.dailySummary && (
+        <SmartDailySummaryCard summary={smartData.dailySummary} />
+      )}
+
+      {intelligence && intelligence.healthPatternBullets.length > 0 && (
+        <PersonalHealthPatternCard
+          patientId={data.patient.id}
+          bullets={intelligence.healthPatternBullets}
+          multiFactorObservations={intelligence.multiFactorInsights}
+        />
+      )}
+
+      {predictions.length > 0 && (
+        <HealthForecastCard
+          predictions={predictions}
+          modelVersion={modelVersion}
+          onOpenDiagnostics={isAdmin ? () => setIsDiagnosticsOpen(true) : undefined}
+        />
+      )}
+
+      {/* 8. PATIENT PROFILE OVERVIEW BANNER */}
+      <PatientOverviewCard
+        patient={data.patient}
+        conditions={data.conditions}
+        onEditProfile={() => setIsEditProfileOpen(true)}
       />
 
       {/* MODAL FORMS */}

@@ -58,6 +58,7 @@ export function MedicineSchedule({
 
   // Base logs + optimistic manual marks
   const [pendingMarks, setPendingMarks] = useState<Map<string, StatusType>>(new Map());
+  const [rollbackError, setRollbackError] = useState<string | null>(null);
 
   const statusMap = logs.reduce((map, log) => {
     map.set(log.medicine_id, log.status as StatusType);
@@ -65,6 +66,10 @@ export function MedicineSchedule({
   }, new Map<string, StatusType>(pendingMarks));
 
   async function handleMark(medicineId: string, status: StatusType) {
+    const previousPending = new Map(pendingMarks);
+    setRollbackError(null);
+
+    // Optimistic update
     setPendingMarks((prev: Map<string, StatusType>) => {
       const next = new Map(prev);
       next.set(medicineId, status);
@@ -82,6 +87,10 @@ export function MedicineSchedule({
       });
       onRefresh();
     } catch {
+      // Rollback to previous state on failure (§35)
+      setPendingMarks(previousPending);
+      setRollbackError("Update save नहीं हो पाया। कृपया पुनः प्रयास करें।");
+      setTimeout(() => setRollbackError(null), 5000);
       onRefresh();
     }
   }
@@ -107,6 +116,12 @@ export function MedicineSchedule({
           + Add Medicine (दवाई जोड़ें)
         </Button>
       </CardHeader>
+
+      {rollbackError && (
+        <div className="mx-4 sm:mx-6 mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs sm:text-sm font-bold text-rose-800 animate-in fade-in">
+          ⚠️ {rollbackError}
+        </div>
+      )}
 
       <div className="p-4 sm:p-6 pt-0 space-y-6">
         {periods.map((period) => {

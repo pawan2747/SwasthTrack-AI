@@ -109,8 +109,12 @@ export function TodaySummaryGrid({
           ? `${todayActivity.steps.toLocaleString()} steps`
           : "No data recorded today",
       helper:
-        todayActivity && todayActivity.distance_km > 0
-          ? `${todayActivity.distance_km} km walked`
+        todayActivity && todayActivity.steps > 0
+          ? [
+              todayActivity.distance_km && todayActivity.distance_km > 0 ? `${todayActivity.distance_km} km` : "",
+              todayActivity.walking_minutes && todayActivity.walking_minutes > 0 ? `${todayActivity.walking_minutes} min` : "",
+              todayActivity.estimated_calories_burned && todayActivity.estimated_calories_burned > 0 ? `${todayActivity.estimated_calories_burned} kcal` : "",
+            ].filter(Boolean).join(" · ") || "Daily physical movement"
           : "Daily physical movement",
       icon: Footprints,
       tone: todayActivity && todayActivity.steps > 0 ? ("green" as const) : ("neutral" as const),

@@ -94,34 +94,34 @@ export function AddWeightDialog({
             <span className="text-2xl font-black text-amber-800">kg</span>
           </div>
 
-          <div className="flex items-center justify-center gap-2 sm:gap-3 mt-4">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2 mt-4">
             <button
               type="button"
               onClick={() => adjustWeight(-0.5)}
-              className="min-h-11 min-w-18 rounded-xl bg-white border-2 border-amber-300 font-black text-sm text-amber-900 hover:bg-amber-100 flex items-center justify-center active:scale-95 shadow-xs"
+              className="flex-1 min-w-0 min-h-10 rounded-xl bg-white border-2 border-amber-300 font-black text-xs sm:text-sm text-amber-900 hover:bg-amber-100 flex items-center justify-center active:scale-95 shadow-2xs"
             >
-              - 0.5 kg
+              -0.5 kg
             </button>
             <button
               type="button"
               onClick={() => adjustWeight(-0.1)}
-              className="min-h-11 min-w-14 rounded-xl bg-white border-2 border-amber-200 font-bold text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-center active:scale-95"
+              className="flex-1 min-w-0 min-h-10 rounded-xl bg-white border-2 border-amber-200 font-bold text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-center active:scale-95"
             >
-              - 0.1
+              -0.1
             </button>
             <button
               type="button"
               onClick={() => adjustWeight(+0.1)}
-              className="min-h-11 min-w-14 rounded-xl bg-white border-2 border-amber-200 font-bold text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-center active:scale-95"
+              className="flex-1 min-w-0 min-h-10 rounded-xl bg-white border-2 border-amber-200 font-bold text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-center active:scale-95"
             >
-              + 0.1
+              +0.1
             </button>
             <button
               type="button"
               onClick={() => adjustWeight(+0.5)}
-              className="min-h-11 min-w-18 rounded-xl bg-white border-2 border-amber-300 font-black text-sm text-amber-900 hover:bg-amber-100 flex items-center justify-center active:scale-95 shadow-xs"
+              className="flex-1 min-w-0 min-h-10 rounded-xl bg-white border-2 border-amber-300 font-black text-xs sm:text-sm text-amber-900 hover:bg-amber-100 flex items-center justify-center active:scale-95 shadow-2xs"
             >
-              + 0.5 kg
+              +0.5 kg
             </button>
           </div>
         </div>
