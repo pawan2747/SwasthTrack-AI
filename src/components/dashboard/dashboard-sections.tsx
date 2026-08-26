@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import {
   CheckCircle2,
+  CheckCheck,
+  Edit3,
   Footprints,
   HeartPulse,
   Pill,
@@ -22,7 +25,9 @@ import {
   logMedicineStatus,
   toggleChecklistItem,
   type DashboardOverview,
+  type MedicineItem,
 } from "@/services/patient-service";
+import { AddMedicineDialog } from "@/components/forms/add-medicine-dialog";
 
 type DashboardSectionsProps = {
   data: DashboardOverview;
@@ -58,6 +63,8 @@ export function DashboardSections({
   } = data;
 
 
+  const [medicineToEdit, setMedicineToEdit] = useState<MedicineItem | null>(null);
+
   const adherencePercent =
     todayMedicineTotalCount > 0
       ? Math.round((todayMedicineTakenCount / todayMedicineTotalCount) * 100)
@@ -73,6 +80,29 @@ export function DashboardSections({
       notes: null,
     });
     onRefresh();
+  }
+
+  async function handleMarkAllMedicinesTaken() {
+    const activeMeds = medicines.filter((m) => m.active);
+    if (activeMeds.length === 0) return;
+    try {
+      await Promise.all(
+        activeMeds.map((m) =>
+          logMedicineStatus({
+            medicine_id: m.id,
+            patient_id: patient.id,
+            scheduled_time: new Date().toISOString(),
+            taken_time: new Date().toISOString(),
+            status: "taken",
+            notes: "1-Tap Mark All Taken via Dashboard",
+          })
+        )
+      );
+      onRefresh();
+    } catch (err) {
+      console.error("Failed to mark all medicines taken:", err);
+      onRefresh();
+    }
   }
 
   async function handleToggleChecklist(itemId: string, currentStatus: string) {
@@ -165,6 +195,19 @@ export function DashboardSections({
               max={100}
               value={adherencePercent}
             />
+
+            {/* 1-TAP BULK MARK ALL TODAY'S MEDICINES */}
+            <div className="mt-3.5">
+              <button
+                type="button"
+                onClick={handleMarkAllMedicinesTaken}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+              >
+                <CheckCheck className="h-4 w-4" />
+                ✓ आज की सभी दवाइयाँ ले लीं (Mark All Taken)
+              </button>
+            </div>
+
             <div className="mt-4 space-y-2.5">
               {medicines
                 .filter((m) => m.active)
@@ -186,6 +229,15 @@ export function DashboardSections({
                           <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
                             {medicine.dose}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setMedicineToEdit(medicine)}
+                            className="text-[11px] font-bold text-slate-600 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+                            title="दवाई का विवरण बदलें"
+                          >
+                            <Edit3 className="h-2.5 w-2.5" />
+                            Edit
+                          </button>
                         </div>
                         <p className="text-xs sm:text-sm font-bold text-slate-700">
                           ⏰ {medicine.scheduled_time.slice(0, 5)} · {medicine.meal_relation ? medicine.meal_relation.replace("_", " ") : "With water"}
@@ -476,6 +528,19 @@ export function DashboardSections({
           })}
         </div>
       </Card>
+
+      {medicineToEdit && (
+        <AddMedicineDialog
+          isOpen={!!medicineToEdit}
+          onClose={() => setMedicineToEdit(null)}
+          patientId={patient.id}
+          medicineToEdit={medicineToEdit}
+          onSuccess={() => {
+            setMedicineToEdit(null);
+            onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }

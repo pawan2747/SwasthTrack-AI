@@ -7,7 +7,7 @@ export function Card({ className, children, ...props }: CardProps) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-emerald-950/10 bg-white p-5 shadow-sm shadow-emerald-950/[0.03]",
+        "rounded-2xl border-2 border-slate-200/80 bg-white p-4 sm:p-6 shadow-md shadow-slate-900/[0.04] transition-all max-w-full overflow-hidden",
         className,
       )}
       {...props}

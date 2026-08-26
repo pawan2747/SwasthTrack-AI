@@ -139,7 +139,7 @@ export default function DashboardPage() {
   if (!data) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       <PageTitle
         description="A real database-backed view of patient vitals, nutrition, medicines, and daily routines."
         eyebrow="Dashboard · दैनिक स्वास्थ्य स्थिति"
