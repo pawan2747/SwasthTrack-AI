@@ -86,23 +86,25 @@ export function BPTrendChart({ logs }: BPTrendChartProps) {
   }));
 
   return (
-    <div className="h-64 w-full">
+    <div className="h-64 w-full relative z-20 overflow-visible">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+        <LineChart data={chartData} margin={{ top: 15, right: 15, left: -10, bottom: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "#94a3b8" }}
+            interval="preserveStartEnd"
+            minTickGap={18}
+            tick={{ fontSize: 10, fill: "#64748b", fontWeight: "600" }}
             tickLine={false}
-            axisLine={{ stroke: "#e2e8f0" }}
+            axisLine={{ stroke: "#cbd5e1" }}
           />
           <YAxis
             domain={[40, 200]}
-            tick={{ fontSize: 10, fill: "#94a3b8" }}
+            tick={{ fontSize: 10, fill: "#64748b", fontWeight: "600" }}
             tickLine={false}
-            axisLine={{ stroke: "#e2e8f0" }}
+            axisLine={{ stroke: "#cbd5e1" }}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 9999 }} />
 
           {/* Normal range reference lines */}
           <ReferenceLine y={120} stroke="#22c55e" strokeDasharray="5 5" strokeOpacity={0.5} />
@@ -113,9 +115,9 @@ export function BPTrendChart({ logs }: BPTrendChartProps) {
             type="monotone"
             dataKey="systolic"
             stroke="#ef4444"
-            strokeWidth={2}
+            strokeWidth={2.5}
             dot={{ r: 3, fill: "#ef4444" }}
-            activeDot={{ r: 5 }}
+            activeDot={{ r: 6 }}
             name="Systolic"
           />
           {/* Diastolic line (blue) */}
@@ -123,24 +125,24 @@ export function BPTrendChart({ logs }: BPTrendChartProps) {
             type="monotone"
             dataKey="diastolic"
             stroke="#3b82f6"
-            strokeWidth={2}
+            strokeWidth={2.5}
             dot={{ r: 3, fill: "#3b82f6" }}
-            activeDot={{ r: 5 }}
+            activeDot={{ r: 6 }}
             name="Diastolic"
           />
         </LineChart>
       </ResponsiveContainer>
 
       {/* Legend */}
-      <div className="mt-2 flex items-center justify-center gap-4 text-[10px] text-slate-500">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-4 rounded bg-red-500" /> Systolic (ऊपर)
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-slate-700">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-4 rounded bg-red-500" /> Systolic (ऊपर)
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-4 rounded bg-blue-500" /> Diastolic (नीचे)
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-4 rounded bg-blue-500" /> Diastolic (नीचे)
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-0.5 w-4 border-t border-dashed border-green-500" /> Normal range
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-green-500" /> Normal range
         </span>
       </div>
     </div>

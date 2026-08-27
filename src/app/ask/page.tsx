@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { getAuthorizedPatients } from "@/services/auth-service";
 import {
   getPatientProfile,
+  recordAIFeedback,
   type PatientProfile,
 } from "@/services/patient-service";
 import {
@@ -161,6 +162,9 @@ export default function AskSwasthTrackPage() {
 
   function handleFeedback(cardId: string, rating: "helpful" | "not_helpful") {
     setFeedbackMap((prev) => ({ ...prev, [cardId]: rating }));
+    if (patient) {
+      recordAIFeedback(patient.id, cardId, rating);
+    }
   }
 
   function handleClearChat() {
@@ -395,6 +399,19 @@ export default function AskSwasthTrackPage() {
                     </div>
                   )}
 
+                  {/* Actionable Health Solution & Guidance Card */}
+                  {card?.healthSolutionHi && (
+                    <div className="mt-3 p-3 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-emerald-950 text-xs font-bold space-y-1">
+                      <p className="font-black text-emerald-900 flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-emerald-700 shrink-0" />
+                        <span>स्वास्थ्य सुझाव एवं उपाय (Action Plan)</span>
+                      </p>
+                      <p className="leading-relaxed text-emerald-950">
+                        {card.healthSolutionHi.replace(/^💡\s*स्वास्थ्य\s*(सलाह|समाधान)\s*&\s*उपाय:\s*/, "")}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Bullet Points */}
                   {card?.bullets && card.bullets.length > 0 && (
                     <div className="mt-2.5 space-y-1 bg-slate-50/60 p-2.5 rounded-xl border border-slate-100">
@@ -419,7 +436,7 @@ export default function AskSwasthTrackPage() {
                   {card && (
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-slate-500">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span>📊 {card.evidence.recordsEvaluated} मान्य रिकॉर्ड्स पर आधारित</span>
+                        <span>📊 {card.evidence.recordsEvaluated} मान्य रिकॉर्ड्स</span>
                         <span>·</span>
                         <span>दिनांक: {card.evidence.dataThroughDate}</span>
                         <span>·</span>
@@ -445,7 +462,7 @@ export default function AskSwasthTrackPage() {
                         }
                         className="text-purple-700 hover:text-purple-950 font-black flex items-center gap-0.5 cursor-pointer underline"
                       >
-                        <span>गणना कैसे हुई?</span>
+                        <span>विश्लेषण कैसे हुआ?</span>
                         {expandedCalculationId === card.id ? (
                           <ChevronUp className="h-3 w-3" />
                         ) : (
@@ -459,11 +476,11 @@ export default function AskSwasthTrackPage() {
                   {card && expandedCalculationId === card.id && (
                     <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 animate-in fade-in duration-100">
                       <p className="font-black text-slate-900">
-                        विधि: {card.evidence.calculationMethodHi} ({card.evidence.calculationMethod})
+                        विधि: {card.evidence.calculationMethodHi}
                       </p>
                       {card.evidence.formulaDetails && (
                         <p className="font-bold text-slate-600">
-                          सूत्र / तर्क: {card.evidence.formulaDetails}
+                          तर्क: {card.evidence.formulaDetails}
                         </p>
                       )}
                       <p className="font-bold text-slate-500">
@@ -474,44 +491,58 @@ export default function AskSwasthTrackPage() {
 
                   {/* Action Link & Feedback Buttons (§47, §48) */}
                   {card && (
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-                      {card.evidence.relatedActionUrl ? (
-                        <Link
-                          href={card.evidence.relatedActionUrl}
-                          className="inline-flex items-center gap-1 text-xs font-black text-purple-700 hover:text-purple-900"
-                        >
-                          <span>{card.evidence.relatedActionLabelHi || "डेटा संशोधन करें"}</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      ) : (
-                        <div />
-                      )}
+                    <div className="mt-3 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        {card.evidence.relatedActionUrl ? (
+                          <Link
+                            href={card.evidence.relatedActionUrl}
+                            className="inline-flex items-center gap-1 text-xs font-black text-purple-700 hover:text-purple-900"
+                          >
+                            <span>{card.evidence.relatedActionLabelHi || "डेटा संशोधन करें"}</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </Link>
+                        ) : (
+                          <div />
+                        )}
 
-                      <div className="flex items-center gap-1 text-xs font-bold text-slate-500">
-                        <span className="text-[11px] mr-1">उपयोगी रहा?</span>
-                        <button
-                          type="button"
-                          onClick={() => handleFeedback(card.id, "helpful")}
-                          className={cn(
-                            "p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer",
-                            feedbackMap[card.id] === "helpful" && "text-emerald-600 font-black"
-                          )}
-                          title="हाँ, उपयोगी रहा"
-                        >
-                          <ThumbsUp className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleFeedback(card.id, "not_helpful")}
-                          className={cn(
-                            "p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer",
-                            feedbackMap[card.id] === "not_helpful" && "text-red-600 font-black"
-                          )}
-                          title="नहीं"
-                        >
-                          <ThumbsDown className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
+                          <span className="text-[11px] font-black">उपयोगी रहा?</span>
+                          <button
+                            type="button"
+                            onClick={() => handleFeedback(card.id, "helpful")}
+                            className={cn(
+                              "p-1 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer",
+                              feedbackMap[card.id] === "helpful" && "text-emerald-700 font-black bg-emerald-100"
+                            )}
+                            title="हाँ, उपयोगी रहा"
+                          >
+                            <ThumbsUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleFeedback(card.id, "not_helpful")}
+                            className={cn(
+                              "p-1 rounded-lg hover:bg-rose-100 transition-colors cursor-pointer",
+                              feedbackMap[card.id] === "not_helpful" && "text-rose-700 font-black bg-rose-100"
+                            )}
+                            title="नहीं"
+                          >
+                            <ThumbsDown className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Toast Feedback Feedback Confirmation */}
+                      {feedbackMap[card.id] === "helpful" && (
+                        <p className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 animate-in fade-in">
+                          👍 धन्यवाद! आपकी सकारात्मक प्रतिक्रिया AI मॉडल को और सटीक बनाने के लिए सहेज ली गई है।
+                        </p>
+                      )}
+                      {feedbackMap[card.id] === "not_helpful" && (
+                        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 animate-in fade-in">
+                          👎 धन्यवाद! आपकी प्रतिक्रिया दर्ज कर ली गई है। हमारी AI इंटेलिजेंस अगले उत्तर को बेहतर करने के लिए सीख रही है।
+                        </p>
+                      )}
                     </div>
                   )}
                 </DepthCard>

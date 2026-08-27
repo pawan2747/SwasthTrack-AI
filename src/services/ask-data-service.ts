@@ -65,6 +65,7 @@ export interface AskDataAnswerCard {
   question: string;
   intent: QuestionIntent;
   summaryHi: string;
+  healthSolutionHi?: string; // 💡 Actionable health guidance/solution
   mainMetric?: {
     labelHi: string;
     value: string;
@@ -321,6 +322,14 @@ export function planQueryFromQuestion(question: string): ParsedQueryPlan {
  * Execute Safe Structured Query Operations & Generate Explainable Answer Card
  */
 export async function answerHealthQuestion(
+  patientId: string,
+  question: string
+): Promise<AskDataAnswerCard> {
+  const card = await _answerHealthQuestionInternal(patientId, question);
+  return attachHealthSolution(card);
+}
+
+async function _answerHealthQuestionInternal(
   patientId: string,
   question: string
 ): Promise<AskDataAnswerCard> {
@@ -865,11 +874,11 @@ export async function answerHealthQuestion(
 }
 
 function makeInsufficientDataCard(question: string, reason: string): AskDataAnswerCard {
-  return {
+  return attachHealthSolution({
     id: `ans-${Date.now()}`,
     question,
     intent: "UNKNOWN",
-    summaryHi: `इस प्रश्न का विश्वसनीय उत्तर देने के लिए अभी पर्याप्त डेटा उपलब्ध नहीं है। ${reason}`,
+    summaryHi: `इस प्रश्न का उत्तर देने के लिए अभी पर्याप्त डेटा उपलब्ध नहीं है। ${reason}`,
     evidence: {
       recordsEvaluated: 0,
       dataThroughDate: getISTDateStr(),
@@ -880,5 +889,39 @@ function makeInsufficientDataCard(question: string, reason: string): AskDataAnsw
       relatedActionLabelHi: "नया रिकॉर्ड जोड़ें",
     },
     timestamp: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
-  };
+  });
+}
+
+export function attachHealthSolution(card: AskDataAnswerCard): AskDataAnswerCard {
+  if (card.healthSolutionHi) return card;
+
+  let solution = "";
+  switch (card.intent) {
+    case "BP_SUMMARY":
+      solution = "💡 स्वास्थ्य सलाह & उपाय: नियमित 2.5L पानी पीएं, भोजन में कम सोडियम (नमक) लें और रोजाना शाम 30 मिनट हल्की वॉक करें।";
+      break;
+    case "WEIGHT_SUMMARY":
+      solution = "💡 स्वास्थ्य सलाह & उपाय: वजन संतुलित रखने के लिए रात 8:00 बजे से पहले सुपाच्य भोजन लें और रोजाना 45 मिनट वाकिंग को दिनचर्या में शामिल करें।";
+      break;
+    case "MEDICINE_ADHERENCE":
+      solution = "💡 स्वास्थ्य सलाह & उपाय: दवाइयों को नियत समय पर लें। भूखे पेट वाली दवाओं को सुबह उठते ही लें। अलार्म या रिमाइंडर सक्रिय रखें।";
+      break;
+    case "FOOD_SUMMARY":
+      solution = "💡 स्वास्थ्य सलाह & उपाय: प्रोटीन युक्त संतुलित आहार लें, तली-भुनी चीजों से बचें और भोजन के बाद 15 मिनट वज्रासन या हल्की वॉक करें।";
+      break;
+    case "ACTIVITY_SUMMARY":
+      solution = "💡 स्वास्थ्य सलाह & उपाय: प्रतिदिन 6,000 से 8,000 कदम चलना हृदय और जोड़ों के लिए उत्तम है। एक साथ चलने के बजाय सुबह-शाम विभाजित करें।";
+      break;
+    case "SLEEP_SUMMARY":
+      solution = "💡 स्वास्थ्य सलाह & उपाय: रात 10:00 बजे तक सोएं और कमरे में शांत वातावरण रखें। सोने से 1 घंटे पहले स्क्रीन समय बंद करें।";
+      break;
+    case "WHAT_CHANGED":
+      solution = "💡 स्वास्थ्य सलाह & उपाय: स्वास्थ्य प्रवृत्तियों में बदलाव आने पर समय पर दवाइयाँ लें और अपनी दैनिक वॉक व पानी की मात्रा संतुलित रखें।";
+      break;
+    default:
+      solution = "💡 स्वास्थ्य सलाह & उपाय: दैनिक दिनचर्या में 30 मिनट वाकिंग, समय पर दवा सेवन और संतुलित पौष्टिक आहार का पालन करें।";
+      break;
+  }
+
+  return { ...card, healthSolutionHi: solution };
 }
