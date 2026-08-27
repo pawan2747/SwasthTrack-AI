@@ -320,9 +320,7 @@ export interface PlatformBenchmarkReport {
 /**
  * Runs the reproducible project benchmark suite.
  */
-export async function runPlatformBenchmarkSuite(
-  patientId?: string
-): Promise<PlatformBenchmarkReport> {
+export async function runPlatformBenchmarkSuite(): Promise<PlatformBenchmarkReport> {
   const scenarios = SIMULATION_SCENARIOS;
   const startTime = Date.now();
 

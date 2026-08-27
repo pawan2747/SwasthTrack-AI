@@ -7,9 +7,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Edit3,
   Plus,
   RotateCcw,
+  Settings,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
   type MedicineLogEntry,
 } from "@/services/patient-service";
 import { AddMedicineDialog } from "@/components/forms/add-medicine-dialog";
+import { ManageMedicinesDialog } from "@/components/forms/manage-medicines-dialog";
 
 type MedicineScheduleProps = {
   patientId: string;
@@ -70,6 +71,7 @@ export function MedicineSchedule({
   const [rollbackError, setRollbackError] = useState<string | null>(null);
   const [bulkSuccessMsg, setBulkSuccessMsg] = useState<string | null>(null);
   const [medicineToEdit, setMedicineToEdit] = useState<MedicineItem | null>(null);
+  const [isManageOpen, setIsManageOpen] = useState(false);
 
   // Load logs whenever selectedDate or patientId changes
   useEffect(() => {
@@ -213,10 +215,20 @@ export function MedicineSchedule({
             दिन के समय के अनुसार दवाइयों की सूची, खुराक और पिछली तारीखों की एंट्री बदलें
           </CardDescription>
         </div>
-        <Button variant="primary" onClick={onAddMedicine} className="h-10 px-4 text-sm font-bold shadow-xs">
-          <Plus className="h-4 w-4" />
-          + Add Medicine (दवाई जोड़ें)
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setIsManageOpen(true)}
+            className="h-10 px-3.5 text-xs sm:text-sm font-bold border-2 border-slate-300 hover:border-slate-400 bg-white text-slate-800 shadow-2xs cursor-pointer"
+          >
+            <Settings className="h-4 w-4 text-slate-700" />
+            <span>⚙️ Edit Medicines (दवाइियाँ सम्पादित करें)</span>
+          </Button>
+          <Button variant="primary" onClick={onAddMedicine} className="h-10 px-4 text-xs sm:text-sm font-bold shadow-xs">
+            <Plus className="h-4 w-4" />
+            <span>+ Add Medicine</span>
+          </Button>
+        </div>
       </CardHeader>
 
       {/* DATE NAVIGATION BAR */}
@@ -374,18 +386,7 @@ export function MedicineSchedule({
                           </div>
 
                           <div className="flex items-center gap-2 self-start shrink-0">
-                            {/* EDIT MEDICINE DETAILS BUTTON */}
-                            <button
-                              type="button"
-                              onClick={() => setMedicineToEdit(medicine)}
-                              className="text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl border border-slate-300 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs active:scale-97"
-                              title="दवाई का नाम, खुराक या समय बदलें"
-                            >
-                              <Edit3 className="h-3.5 w-3.5 text-slate-600" />
-                              <span>Edit (विवरण बदलें)</span>
-                            </button>
-
-                            <div className="flex items-center gap-1.5 text-sm font-black text-slate-900 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-900 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
                               <Clock aria-hidden="true" className="h-4 w-4 text-emerald-700" />
                               <span>{medicine.scheduled_time.slice(0, 5)}</span>
                             </div>
@@ -453,6 +454,16 @@ export function MedicineSchedule({
           );
         })}
       </div>
+
+      {/* MANAGE MEDICINES DIALOG */}
+      {isManageOpen && (
+        <ManageMedicinesDialog
+          isOpen={isManageOpen}
+          onClose={() => setIsManageOpen(false)}
+          patientId={patientId}
+          onSuccess={onRefresh}
+        />
+      )}
 
       {/* EDIT MEDICINE DIALOG */}
       {medicineToEdit && (

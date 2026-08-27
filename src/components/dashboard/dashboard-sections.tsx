@@ -4,13 +4,13 @@ import { useState } from "react";
 import {
   CheckCircle2,
   CheckCheck,
-  Edit3,
   Footprints,
   HeartPulse,
   Pill,
   Plus,
   Scale,
   Utensils,
+  Settings,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import {
   type MedicineItem,
 } from "@/services/patient-service";
 import { AddMedicineDialog } from "@/components/forms/add-medicine-dialog";
+import { ManageMedicinesDialog } from "@/components/forms/manage-medicines-dialog";
 
 type DashboardSectionsProps = {
   data: DashboardOverview;
@@ -67,6 +68,7 @@ export function DashboardSections({
 
 
   const [medicineToEdit, setMedicineToEdit] = useState<MedicineItem | null>(null);
+  const [isManageOpen, setIsManageOpen] = useState(false);
 
   const adherencePercent =
     todayMedicineTotalCount > 0
@@ -198,10 +200,16 @@ export function DashboardSections({
                 : "No active medicines in profile"}
             </CardDescription>
           </div>
-          <Button variant="secondary" onClick={onOpenMedicine} className="h-9 px-3 text-xs">
-            <Plus className="h-3.5 w-3.5" />
-            Manage
-          </Button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button variant="secondary" onClick={() => setIsManageOpen(true)} className="h-9 px-2.5 text-xs font-bold border border-slate-300 hover:bg-slate-100 cursor-pointer">
+              <Settings className="h-3.5 w-3.5 text-slate-700" />
+              <span>⚙️ Edit Medicines</span>
+            </Button>
+            <Button variant="secondary" onClick={onOpenMedicine} className="h-9 px-2.5 text-xs font-bold cursor-pointer">
+              <Plus className="h-3.5 w-3.5" />
+              <span>Tracker</span>
+            </Button>
+          </div>
         </CardHeader>
 
         {medicines.filter((m) => m.active).length > 0 ? (
@@ -235,27 +243,18 @@ export function DashboardSections({
                   return (
                     <div
                       key={medicine.id}
-                      className="flex flex-col gap-3 rounded-2xl border-2 border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-2 rounded-2xl border-2 border-slate-200 bg-white p-3 sm:p-3.5 shadow-2xs sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-0.5">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-black text-slate-950">
+                          <p className="text-sm sm:text-base font-black text-slate-950">
                             {medicine.medicine_name}
                           </p>
-                          <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                          <span className="text-[11px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
                             {medicine.dose}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setMedicineToEdit(medicine)}
-                            className="text-[11px] font-bold text-slate-600 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
-                            title="दवाई का विवरण बदलें"
-                          >
-                            <Edit3 className="h-2.5 w-2.5" />
-                            Edit
-                          </button>
                         </div>
-                        <p className="text-xs sm:text-sm font-bold text-slate-700">
+                        <p className="text-xs font-bold text-slate-600">
                           ⏰ {medicine.scheduled_time.slice(0, 5)} · {medicine.meal_relation ? medicine.meal_relation.replace("_", " ") : "With water"}
                         </p>
                       </div>
@@ -532,6 +531,15 @@ export function DashboardSections({
           })}
         </div>
       </Card>
+
+      {isManageOpen && (
+        <ManageMedicinesDialog
+          isOpen={isManageOpen}
+          onClose={() => setIsManageOpen(false)}
+          patientId={patient.id}
+          onSuccess={onRefresh}
+        />
+      )}
 
       {medicineToEdit && (
         <AddMedicineDialog
