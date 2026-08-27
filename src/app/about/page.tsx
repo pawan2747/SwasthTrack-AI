@@ -183,12 +183,12 @@ export default function AboutPage() {
 
       {/* CREATOR FOOTER */}
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center space-y-2">
-        <div className="flex flex-wrap items-center justify-center gap-1.5 text-sm font-bold text-slate-900">
+        <div className="flex items-center justify-center gap-1.5 text-sm font-bold text-slate-900">
           <span>Made with</span>
           <Heart className="h-4 w-4 fill-rose-500 text-rose-500 inline" />
-          <span>by <strong className="font-extrabold text-slate-950">Vishal Kumar</strong> &amp; <strong className="font-extrabold text-slate-950">Hemant Kumar</strong> with guidance of <strong className="font-extrabold text-emerald-800">Pawan Kumar</strong></span>
+          <span>by Pawan Kumar</span>
         </div>
-        <p className="text-xs text-slate-500 font-medium">
+        <p className="text-xs text-slate-500">
           Built with care for families who care for each other.
         </p>
       </div>

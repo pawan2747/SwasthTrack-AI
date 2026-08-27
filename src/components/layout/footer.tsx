@@ -43,12 +43,12 @@ export function Footer() {
         </div>
 
         {/* Bottom Attribution & Copyright */}
-        <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-[11px] text-slate-500">
+        <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-[11px] text-slate-400">
           <p>© {new Date().getFullYear()} SwasthTrack. All rights reserved.</p>
-          <div className="flex flex-wrap items-center gap-1 font-medium text-slate-700">
+          <div className="flex items-center gap-1 font-medium text-slate-600">
             <span>Made with</span>
             <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500 inline" />
-            <span>by <strong className="font-bold text-slate-900">Vishal Kumar</strong> &amp; <strong className="font-bold text-slate-900">Hemant Kumar</strong> with guidance of <strong className="font-bold text-emerald-800">Pawan Kumar</strong></span>
+            <span>by <strong className="font-semibold text-slate-800">Pawan Kumar</strong></span>
           </div>
         </div>
       </div>
