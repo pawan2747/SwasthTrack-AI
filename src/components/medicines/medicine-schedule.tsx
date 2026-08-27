@@ -25,6 +25,7 @@ import {
   getTodayDateString,
   logMedicineStatus,
   deleteMedicineLog,
+  evaluateMedicineStatusAndMessage,
   type MedicineItem,
   type MedicineLogEntry,
 } from "@/services/patient-service";
@@ -98,16 +99,22 @@ export function MedicineSchedule({
     return map;
   }, new Map<string, StatusType>(pendingMarks));
 
-  async function handleMark(medicine: MedicineItem, status: StatusType) {
+  async function handleMarkAuto(medicine: MedicineItem) {
     const previousPending = new Map(pendingMarks);
     setRollbackError(null);
+
+    const evalResult = evaluateMedicineStatusAndMessage(medicine, selectedDate);
+    const finalStatus = evalResult.computedStatus;
 
     // Optimistic update
     setPendingMarks((prev) => {
       const next = new Map(prev);
-      next.set(medicine.id, status);
+      next.set(medicine.id, finalStatus);
       return next;
     });
+
+    setBulkSuccessMsg(evalResult.userMessageHi);
+    setTimeout(() => setBulkSuccessMsg(null), 4500);
 
     try {
       const targetTime = `${selectedDate}T${medicine.scheduled_time}`;
@@ -115,9 +122,9 @@ export function MedicineSchedule({
         medicine_id: medicine.id,
         patient_id: patientId,
         scheduled_time: targetTime,
-        taken_time: status === "taken" || status === "late" ? targetTime : null,
-        status,
-        notes: null,
+        taken_time: new Date().toISOString(),
+        status: finalStatus,
+        notes: evalResult.isLate ? "Auto-Late Evaluation: Taken after schedule window" : null,
       });
       const updated = await getMedicineLogsByDate(patientId, selectedDate);
       setCurrentLogs(updated);
@@ -404,45 +411,31 @@ export function MedicineSchedule({
                               )}
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                            <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
                               <button
                                 type="button"
-                                onClick={() => handleMark(medicine, "taken")}
+                                onClick={() => handleMarkAuto(medicine)}
                                 className={cn(
-                                  "min-h-12 rounded-xl border-2 px-3 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98",
+                                  "flex-1 min-h-12 rounded-xl border-2 px-4 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-xs",
                                   currentStatus === "taken"
                                     ? statusStyles.taken
-                                    : "border-slate-300 bg-white text-slate-800 hover:border-emerald-400 hover:bg-emerald-50",
+                                    : currentStatus === "late"
+                                    ? statusStyles.late
+                                    : currentStatus === "missed"
+                                    ? "border-rose-400 bg-rose-50 text-rose-900 font-black hover:bg-emerald-50 hover:text-emerald-900"
+                                    : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-md",
                                 )}
                               >
                                 <span>✓</span>
-                                <span>Taken (लिया)</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleMark(medicine, "late")}
-                                className={cn(
-                                  "min-h-12 rounded-xl border-2 px-3 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98",
-                                  currentStatus === "late"
-                                    ? statusStyles.late
-                                    : "border-slate-300 bg-white text-slate-800 hover:border-amber-400 hover:bg-amber-50",
-                                )}
-                              >
-                                <span>⏳</span>
-                                <span>Late (देर)</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleMark(medicine, "missed")}
-                                className={cn(
-                                  "min-h-12 rounded-xl border-2 px-3 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98",
-                                  currentStatus === "missed"
-                                    ? statusStyles.missed
-                                    : "border-slate-300 bg-white text-slate-800 hover:border-rose-400 hover:bg-rose-50",
-                                )}
-                              >
-                                <span>✗</span>
-                                <span>Missed (छूटा)</span>
+                                <span>
+                                  {currentStatus === "taken"
+                                    ? "✓ Taken On Time (समय पर ली गई)"
+                                    : currentStatus === "late"
+                                    ? "⏳ Taken Late (देर से ली गई)"
+                                    : currentStatus === "missed"
+                                    ? "✗ Missed (4+h बीत गए - अब दर्ज करें)"
+                                    : "✓ Taken (ली गई)"}
+                                </span>
                               </button>
                             </div>
                           </div>

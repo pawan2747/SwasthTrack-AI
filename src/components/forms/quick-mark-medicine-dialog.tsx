@@ -8,6 +8,8 @@ import {
   getMedicines,
   getTodayMedicineLogs,
   logMedicineStatus,
+  getTodayDateString,
+  evaluateMedicineStatusAndMessage,
   type MedicineItem,
   type MedicineLogEntry,
 } from "@/services/patient-service";
@@ -76,25 +78,33 @@ export function QuickMarkMedicineDialog({
     return map;
   }, new Map<string, StatusType>(pendingMarks));
 
-  async function handleMark(medicineId: string, status: StatusType) {
+  async function handleMarkAuto(medicine: MedicineItem) {
     const previousPending = new Map(pendingMarks);
     setErrorMsg("");
+
+    const todayStr = getTodayDateString();
+    const evalResult = evaluateMedicineStatusAndMessage(medicine, todayStr);
+    const finalStatus = evalResult.computedStatus;
 
     // Optimistic UI update
     setPendingMarks((prev) => {
       const next = new Map(prev);
-      next.set(medicineId, status);
+      next.set(medicine.id, finalStatus);
       return next;
     });
 
+    setSuccessMsg(evalResult.userMessageHi);
+    setTimeout(() => setSuccessMsg(""), 4500);
+
     try {
+      const targetTime = `${todayStr}T${medicine.scheduled_time}`;
       await logMedicineStatus({
-        medicine_id: medicineId,
+        medicine_id: medicine.id,
         patient_id: patientId,
-        scheduled_time: new Date().toISOString(),
-        taken_time: status === "taken" || status === "late" ? new Date().toISOString() : null,
-        status,
-        notes: null,
+        scheduled_time: targetTime,
+        taken_time: new Date().toISOString(),
+        status: finalStatus,
+        notes: evalResult.isLate ? "Auto-Late Evaluation: Marked taken after schedule window" : null,
       });
       const updatedLogs = await getTodayMedicineLogs(patientId);
       setLogs(updatedLogs);
@@ -263,46 +273,32 @@ export function QuickMarkMedicineDialog({
                             </div>
                           </div>
 
-                          {/* ACTION BUTTONS */}
-                          <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+                          {/* SINGLE ACTION BUTTON (Auto-Evaluated Taken / Late / Missed) */}
+                          <div className="pt-1 border-t border-slate-100">
                             <button
                               type="button"
-                              onClick={() => handleMark(medicine.id, "taken")}
+                              onClick={() => handleMarkAuto(medicine)}
                               className={cn(
-                                "min-h-10 rounded-xl border-2 px-2 text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-98",
+                                "w-full min-h-10 rounded-xl border-2 px-3 text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 shadow-2xs",
                                 currentStatus === "taken"
                                   ? statusStyles.taken
-                                  : "border-slate-300 bg-white text-slate-800 hover:border-emerald-400 hover:bg-emerald-50",
+                                  : currentStatus === "late"
+                                  ? statusStyles.late
+                                  : currentStatus === "missed"
+                                  ? "border-rose-300 bg-rose-50 text-rose-800 hover:border-emerald-500 hover:bg-emerald-600 hover:text-white"
+                                  : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-xs"
                               )}
                             >
                               <span>✓</span>
-                              <span>Taken</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMark(medicine.id, "late")}
-                              className={cn(
-                                "min-h-10 rounded-xl border-2 px-2 text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-98",
-                                currentStatus === "late"
-                                  ? statusStyles.late
-                                  : "border-slate-300 bg-white text-slate-800 hover:border-amber-400 hover:bg-amber-50",
-                              )}
-                            >
-                              <span>⏳</span>
-                              <span>Late</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMark(medicine.id, "missed")}
-                              className={cn(
-                                "min-h-10 rounded-xl border-2 px-2 text-xs font-black transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-98",
-                                currentStatus === "missed"
-                                  ? statusStyles.missed
-                                  : "border-slate-300 bg-white text-slate-800 hover:border-rose-400 hover:bg-rose-50",
-                              )}
-                            >
-                              <span>✗</span>
-                              <span>Missed</span>
+                              <span>
+                                {currentStatus === "taken"
+                                  ? "✓ Taken On Time (समय पर ली)"
+                                  : currentStatus === "late"
+                                  ? "⏳ Taken Late (देर से ली)"
+                                  : currentStatus === "missed"
+                                  ? "✗ Missed (4+ घंटे बीते - दर्ज करें)"
+                                  : "✓ Taken (ली गई)"}
+                              </span>
                             </button>
                           </div>
                         </div>

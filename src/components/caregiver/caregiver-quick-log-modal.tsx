@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   getMedicines,
+  getTodayDateString,
+  evaluateMedicineStatusAndMessage,
   logActivity,
   logBloodPressure,
   logFood,
@@ -143,12 +145,15 @@ export function CaregiverQuickLogModal({
   async function handleMarkMedicineTaken(med: MedicineItem) {
     setSubmitting(true);
     try {
+      const todayStr = getTodayDateString();
+      const evalRes = evaluateMedicineStatusAndMessage(med, todayStr);
       await logMedicineStatus({
         patient_id: patientId,
         medicine_id: med.id,
-        status: "taken",
-        scheduled_time: new Date().toISOString(),
+        status: evalRes.computedStatus,
+        scheduled_time: `${todayStr}T${med.scheduled_time}`,
         taken_time: new Date().toISOString(),
+        notes: evalRes.isLate ? "Caregiver logged after scheduled window (Auto-Late)" : "Caregiver logged",
       });
       invalidateCaregiverCache(patientId);
       onSuccess();

@@ -25,6 +25,8 @@ import {
   logMedicineStatus,
   deleteMedicineLog,
   toggleChecklistItem,
+  getTodayDateString,
+  evaluateMedicineStatusAndMessage,
   type DashboardOverview,
   type MedicineItem,
 } from "@/services/patient-service";
@@ -71,24 +73,27 @@ export function DashboardSections({
       ? Math.round((todayMedicineTakenCount / todayMedicineTotalCount) * 100)
       : 0;
 
-  async function handleMarkMedicine(medicineId: string, status: "taken" | "late" | "missed") {
+  async function handleMarkMedicine(medicine: MedicineItem) {
     const todayLogs = data.todayMedicineLogs || [];
-    const logItem = todayLogs.find((l) => l.medicine_id === medicineId);
+    const logItem = todayLogs.find((l) => l.medicine_id === medicine.id);
 
-    // If user taps the already active status, unmark/clear the entry
-    if (logItem && logItem.status === status) {
+    // If user taps already active status, unmark/clear the entry
+    if (logItem) {
       await deleteMedicineLog(logItem.id);
       onRefresh();
       return;
     }
 
+    const todayStr = getTodayDateString();
+    const evalRes = evaluateMedicineStatusAndMessage(medicine, todayStr);
+
     await logMedicineStatus({
-      medicine_id: medicineId,
+      medicine_id: medicine.id,
       patient_id: patient.id,
-      scheduled_time: new Date().toISOString(),
-      taken_time: status === "taken" || status === "late" ? new Date().toISOString() : null,
-      status,
-      notes: null,
+      scheduled_time: `${todayStr}T${medicine.scheduled_time}`,
+      taken_time: new Date().toISOString(),
+      status: evalRes.computedStatus,
+      notes: evalRes.isLate ? "Auto-Late Evaluation: Taken past schedule window" : null,
     });
     onRefresh();
   }
@@ -258,36 +263,24 @@ export function DashboardSections({
                       <div className="flex items-center gap-2 pt-1 sm:pt-0 shrink-0">
                         <button
                           type="button"
-                          onClick={() => handleMarkMedicine(medicine.id, "taken")}
-                          className={`min-h-10 rounded-xl border-2 px-3 py-1.5 text-xs sm:text-sm font-black transition-all ${
+                          onClick={() => handleMarkMedicine(medicine)}
+                          className={`min-h-10 rounded-xl border-2 px-3.5 py-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer active:scale-98 shadow-xs ${
                             currentStatus === "taken"
-                              ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
-                              : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              : currentStatus === "late"
+                              ? "border-amber-500 bg-amber-500 text-white"
+                              : currentStatus === "missed"
+                              ? "border-rose-400 bg-rose-50 text-rose-900 font-black hover:bg-emerald-50"
+                              : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-md"
                           }`}
                         >
-                          ✓ Taken (लिया)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMarkMedicine(medicine.id, "late")}
-                          className={`min-h-10 rounded-xl border-2 px-3 py-1.5 text-xs sm:text-sm font-black transition-all ${
-                            currentStatus === "late"
-                              ? "border-amber-500 bg-amber-500 text-white shadow-xs"
-                              : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                          }`}
-                        >
-                          ⏳ Late
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMarkMedicine(medicine.id, "missed")}
-                          className={`min-h-10 rounded-xl border-2 px-3 py-1.5 text-xs sm:text-sm font-black transition-all ${
-                            currentStatus === "missed"
-                              ? "border-rose-600 bg-rose-600 text-white shadow-xs"
-                              : "border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100"
-                          }`}
-                        >
-                          ✗ Missed
+                          {currentStatus === "taken"
+                            ? "✓ Taken On Time (समय पर ली गई)"
+                            : currentStatus === "late"
+                            ? "⏳ Taken Late (देर से ली गई)"
+                            : currentStatus === "missed"
+                            ? "✗ Missed (4+h बीत गए - अब दर्ज करें)"
+                            : "✓ Taken (ली गई)"}
                         </button>
                       </div>
                     </div>

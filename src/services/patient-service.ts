@@ -2084,8 +2084,109 @@ export async function getSleepLogs(patientId?: string, limit = 14): Promise<Slee
 }
 
 // ----------------------------------------------------
-// MEDICINE LOGS & STATUS
+// MEDICINE LOGS & STATUS EVALUATION (§Auto-Late & Auto-Missed)
 // ----------------------------------------------------
+
+export interface MedicineEvaluationResult {
+  computedStatus: "taken" | "late" | "missed";
+  userMessageHi: string;
+  userMessageEn: string;
+  isLate: boolean;
+  isMissed: boolean;
+}
+
+/**
+ * Intelligent evaluation of medicine status based on prescription rules:
+ * 1. Morning Empty Stomach ("bhukhe pet") medicine marked taken after 10:00 AM -> status = "late"
+ * 2. Any medicine marked > 2 hours past scheduled time -> status = "late"
+ * 3. Medicine taken within schedule window -> status = "taken"
+ */
+export function evaluateMedicineStatusAndMessage(
+  medicine: MedicineItem,
+  scheduledDateStr: string,
+  actualActionIso?: string
+): MedicineEvaluationResult {
+  const actionDate = actualActionIso ? new Date(actualActionIso) : new Date();
+
+  // Extract scheduled hour and minute
+  const schedTimeParts = medicine.scheduled_time ? medicine.scheduled_time.split(":") : ["08", "00"];
+  const schedHour = parseInt(schedTimeParts[0], 10);
+  const schedMin = parseInt(schedTimeParts[1] || "0", 10);
+
+  // Construct local scheduled Date object
+  const scheduledDate = new Date(
+    `${scheduledDateStr}T${String(schedHour).padStart(2, "0")}:${String(schedMin).padStart(2, "0")}:00`
+  );
+
+  // Empty stomach / morning before food check
+  const isMorningEmptyStomach =
+    (medicine.meal_relation === "before_meal" || medicine.frequency?.includes("भूखे पेट")) &&
+    schedHour < 11;
+
+  const actionHour = actionDate.getHours();
+
+  // Calculate delay in minutes
+  const diffMs = actionDate.getTime() - scheduledDate.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+  // Rule 1: Morning empty stomach taken after 10:00 AM -> LATE
+  if (isMorningEmptyStomach && (actionHour >= 10 || diffMinutes > 120)) {
+    return {
+      computedStatus: "late",
+      isLate: true,
+      isMissed: false,
+      userMessageHi: `आपने "${medicine.medicine_name}" (भूखे पेट वाली दवा) 10:00 AM के बाद (Late) ली है।`,
+      userMessageEn: `You took "${medicine.medicine_name}" (empty stomach dose) after 10:00 AM (Late).`,
+    };
+  }
+
+  // Rule 2: Any medicine taken > 2 hours (120 mins) past scheduled time -> LATE
+  if (diffMinutes > 120) {
+    const hoursLate = (diffMinutes / 60).toFixed(1);
+    return {
+      computedStatus: "late",
+      isLate: true,
+      isMissed: false,
+      userMessageHi: `आपने "${medicine.medicine_name}" निर्धारित समय से ${hoursLate} घंटे बाद (Late) ली है।`,
+      userMessageEn: `You took "${medicine.medicine_name}" ${hoursLate} hours after scheduled time (Late).`,
+    };
+  }
+
+  // Rule 3: Taken On Time
+  return {
+    computedStatus: "taken",
+    isLate: false,
+    isMissed: false,
+    userMessageHi: `"${medicine.medicine_name}" समय पर दर्ज हो गई (Taken)! ✅`,
+    userMessageEn: `"${medicine.medicine_name}" marked taken on time! ✅`,
+  };
+}
+
+/**
+ * Check if a scheduled medicine missed its 4-hour deadline window
+ */
+export function isMedicinePast4HourDeadline(
+  medicine: MedicineItem,
+  scheduledDateStr: string
+): boolean {
+  const now = new Date();
+  const todayStr = getTodayDateString();
+
+  // Only auto-miss for today or past dates
+  if (scheduledDateStr > todayStr) return false;
+
+  const schedTimeParts = medicine.scheduled_time ? medicine.scheduled_time.split(":") : ["08", "00"];
+  const schedHour = parseInt(schedTimeParts[0], 10);
+  const schedMin = parseInt(schedTimeParts[1] || "0", 10);
+
+  const deadlineDate = new Date(
+    `${scheduledDateStr}T${String(schedHour).padStart(2, "0")}:${String(schedMin).padStart(2, "0")}:00`
+  );
+  // Add 4 hours grace deadline
+  deadlineDate.setHours(deadlineDate.getHours() + 4);
+
+  return now.getTime() > deadlineDate.getTime();
+}
 
 export async function logMedicineStatus(
   log: Omit<Database["public"]["Tables"]["medicine_logs"]["Insert"], "id" | "created_at">,
@@ -2196,6 +2297,8 @@ export async function getMedicineLogsByDate(
   const startOfDay = `${targetDate}T00:00:00.000Z`;
   const endOfDay = `${targetDate}T23:59:59.999Z`;
 
+  let existingLogs: MedicineLogEntry[] = [];
+
   if (isSupabaseConfigured) {
     try {
       const { data, error } = await supabase
@@ -2207,7 +2310,7 @@ export async function getMedicineLogsByDate(
         .order("scheduled_time", { ascending: true });
 
       if (!error && data && data.length > 0) {
-        return data as unknown as MedicineLogEntry[];
+        existingLogs = data as unknown as MedicineLogEntry[];
       }
     } catch (err) {
       console.error("Supabase getMedicineLogsByDate error:", err);
@@ -2219,12 +2322,36 @@ export async function getMedicineLogsByDate(
     return SEEDED_PAPA_MED_LOGS_26;
   }
 
-  const stored = getStorageItem<MedicineLogEntry[]>("swasthtrack_medicine_logs", []);
-  const filtered = stored.filter(
-    (m) => m.patient_id === pid && m.scheduled_time.startsWith(targetDate),
-  );
+  if (existingLogs.length === 0) {
+    const stored = getStorageItem<MedicineLogEntry[]>("swasthtrack_medicine_logs", []);
+    existingLogs = stored.filter(
+      (m) => m.patient_id === pid && m.scheduled_time.startsWith(targetDate),
+    );
+  }
 
-  return filtered;
+  // Auto-eval: Check if any active medicines are past their 4-hour deadline and generate auto-missed virtual logs
+  const activeMeds = await getMedicines(pid);
+  const existingMedIds = new Set(existingLogs.map((l) => l.medicine_id));
+  const autoMissedLogs: MedicineLogEntry[] = [];
+
+  for (const med of activeMeds) {
+    if (med.active && !existingMedIds.has(med.id)) {
+      if (isMedicinePast4HourDeadline(med, targetDate)) {
+        autoMissedLogs.push({
+          id: `auto-missed-${med.id}-${targetDate}`,
+          patient_id: pid,
+          medicine_id: med.id,
+          scheduled_time: `${targetDate}T${med.scheduled_time}`,
+          taken_time: null,
+          status: "missed",
+          notes: "4 घंटे की समयावधि बीतने के कारण स्वतः (Auto-Missed) दर्ज",
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  return [...existingLogs, ...autoMissedLogs];
 }
 
 export async function getTodayMedicineLogs(patientId?: string): Promise<MedicineLogEntry[]> {
