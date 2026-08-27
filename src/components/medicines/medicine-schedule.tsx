@@ -201,9 +201,9 @@ export function MedicineSchedule({
   return (
     <Card className="border-2 border-slate-200/90 shadow-md">
       {/* HEADER & DATE NAVIGATOR */}
-      <CardHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-slate-100">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6 pb-4 border-b border-slate-100">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-xl sm:text-2xl font-black text-slate-900">
               Medicine Schedule
             </CardTitle>
@@ -211,21 +211,21 @@ export function MedicineSchedule({
               दवाइयों का समय
             </Badge>
           </div>
-          <CardDescription className="text-sm font-medium text-slate-600 mt-1">
-            दिन के समय के अनुसार दवाइयों की सूची, खुराक और पिछली तारीखों की एंट्री बदलें
+          <CardDescription className="text-xs sm:text-sm font-medium text-slate-600 mt-1">
+            दिन के समय के अनुसार दवाइयों की सूची एवं खुराक दर्ज करें
           </CardDescription>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
           <Button
             variant="secondary"
             onClick={() => setIsManageOpen(true)}
-            className="h-10 px-3.5 text-xs sm:text-sm font-bold border-2 border-slate-300 hover:border-slate-400 bg-white text-slate-800 shadow-2xs cursor-pointer"
+            className="flex-1 sm:flex-none h-10 px-3.5 text-xs sm:text-sm font-bold border-2 border-slate-300 hover:border-slate-400 bg-white text-slate-800 shadow-2xs cursor-pointer"
           >
-            <Settings className="h-4 w-4 text-slate-700" />
-            <span>⚙️ Edit Medicines (दवाइियाँ सम्पादित करें)</span>
+            <Settings className="h-4 w-4 text-slate-700 shrink-0" />
+            <span>⚙️ Edit / बदलें</span>
           </Button>
-          <Button variant="primary" onClick={onAddMedicine} className="h-10 px-4 text-xs sm:text-sm font-bold shadow-xs">
-            <Plus className="h-4 w-4" />
+          <Button variant="primary" onClick={onAddMedicine} className="flex-1 sm:flex-none h-10 px-4 text-xs sm:text-sm font-bold shadow-xs cursor-pointer">
+            <Plus className="h-4 w-4 shrink-0" />
             <span>+ Add Medicine</span>
           </Button>
         </div>

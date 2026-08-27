@@ -188,7 +188,7 @@ export function DashboardSections({
 
       {/* 2. MEDICINE ADHERENCE */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <CardTitle>Medicine Adherence</CardTitle>
@@ -200,13 +200,21 @@ export function DashboardSections({
                 : "No active medicines in profile"}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button variant="secondary" onClick={() => setIsManageOpen(true)} className="h-9 px-2.5 text-xs font-bold border border-slate-300 hover:bg-slate-100 cursor-pointer">
-              <Settings className="h-3.5 w-3.5 text-slate-700" />
-              <span>⚙️ Edit Medicines</span>
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            <Button
+              variant="secondary"
+              onClick={() => setIsManageOpen(true)}
+              className="flex-1 sm:flex-none h-9 px-3 text-xs font-bold border border-slate-300 hover:bg-slate-100 cursor-pointer"
+            >
+              <Settings className="h-3.5 w-3.5 text-slate-700 shrink-0" />
+              <span>⚙️ Edit</span>
             </Button>
-            <Button variant="secondary" onClick={onOpenMedicine} className="h-9 px-2.5 text-xs font-bold cursor-pointer">
-              <Plus className="h-3.5 w-3.5" />
+            <Button
+              variant="secondary"
+              onClick={onOpenMedicine}
+              className="flex-1 sm:flex-none h-9 px-3 text-xs font-bold cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" />
               <span>Tracker</span>
             </Button>
           </div>

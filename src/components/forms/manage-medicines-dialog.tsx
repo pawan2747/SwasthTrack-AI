@@ -89,8 +89,8 @@ export function ManageMedicinesDialog({
       >
         <div className="space-y-4 max-w-full">
           {/* TOP ACTION BAR */}
-          <div className="flex items-center justify-between gap-3 p-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/70">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border-2 border-emerald-200 bg-emerald-50/70">
+            <div className="flex items-center gap-2.5">
               <Pill className="h-5 w-5 text-emerald-700 shrink-0" />
               <div>
                 <p className="text-xs sm:text-sm font-black text-emerald-950">
@@ -104,7 +104,7 @@ export function ManageMedicinesDialog({
             <button
               type="button"
               onClick={() => setIsAddOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-97 text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition-all cursor-pointer shrink-0"
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-97 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer shrink-0"
             >
               <Plus className="h-4 w-4" />
               <span>+ नई दवा जोड़ें</span>
