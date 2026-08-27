@@ -27,11 +27,9 @@ type WeightPanelProps = {
   onSuccess?: () => void;
 };
 
-// Check if entry is within 2-hour edit window
+// Allow editing/correcting weight entries
 function canEditEntry(createdAt: string): boolean {
-  const created = new Date(createdAt).getTime();
-  const now = Date.now();
-  return now - created < 2 * 60 * 60 * 1000;
+  return Boolean(createdAt);
 }
 
 type ChartRange = "7d" | "30d" | "3m" | "6m" | "1y";

@@ -108,13 +108,13 @@ export default function SimulationLabPage() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-teal-600" />
-              DPDP Act 2023
+              Privacy Safeguards
             </span>
-            <Badge variant="green">Audited</Badge>
+            <Badge variant="green">Verified</Badge>
           </div>
           <p className="mt-2 text-xl sm:text-2xl font-black text-emerald-700 flex items-center gap-1.5">
             <CheckCircle2 className="h-5 w-5" />
-            Compliant
+            Active (Isolated)
           </p>
           <p className="mt-1 text-[11px] text-slate-500 font-medium">
             Zero raw-data mutation &amp; RLS enforced

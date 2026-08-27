@@ -54,8 +54,8 @@ export function DeveloperDiagnosticsModal({
               <span className="font-bold">Multi-Engine Federation</span>
             </div>
             <div>
-              <span className="text-slate-400 block">DPDP Act 2023:</span>
-              <span className="font-bold text-emerald-700">Compliant</span>
+              <span className="text-slate-400 block">Privacy Safeguards:</span>
+              <span className="font-bold text-emerald-700">Active (Isolated)</span>
             </div>
           </div>
         </div>
@@ -73,7 +73,7 @@ export function DeveloperDiagnosticsModal({
           <div className="rounded-xl border border-slate-200 bg-white p-3">
             <span className="text-[10px] uppercase font-bold text-slate-400">Intelligence Reliability</span>
             <p className="mt-1 text-base font-black text-indigo-950">
-              98.4%
+              Experimental
             </p>
             <span className="text-[10px] text-slate-500">10/10 Lab Scenarios</span>
           </div>

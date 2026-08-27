@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   CalendarDays,
   History,
+  MessageSquareText,
   Settings,
   UserCheck,
   UserCircle,
@@ -56,6 +57,18 @@ export function Header() {
             }`}
           >
             <History className="h-4.5 w-4.5" />
+          </Link>
+
+          <Link
+            href="/ask"
+            title="Ask SwasthTrack (डेटा से पूछें)"
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+              pathname === "/ask"
+                ? "border-purple-600 bg-purple-100 text-purple-900 shadow-2xs"
+                : "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
+            }`}
+          >
+            <MessageSquareText className="h-4.5 w-4.5" />
           </Link>
 
           <Link
@@ -126,6 +139,18 @@ export function Header() {
           >
             <History className="h-4 w-4 text-emerald-600" />
             <span>Timeline (यात्रा)</span>
+          </Link>
+
+          <Link
+            href="/ask"
+            className={`flex min-h-10 items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              pathname === "/ask"
+                ? "border-purple-600 bg-purple-100 text-purple-900 shadow-2xs"
+                : "border-purple-200 bg-purple-50 text-purple-700 hover:border-purple-300 hover:bg-purple-100"
+            }`}
+          >
+            <MessageSquareText className="h-4 w-4 text-purple-600" />
+            <span>Ask Data (डेटा से पूछें)</span>
           </Link>
 
           <div className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">

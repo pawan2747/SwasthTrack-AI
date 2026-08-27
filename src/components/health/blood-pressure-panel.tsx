@@ -50,11 +50,9 @@ function getBPFlag(systolic: number, diastolic: number): { label: string; labelH
   return { label: "Significantly above monitoring range", labelHi: "यह reading सामान्य monitoring range से बाहर है", color: "text-rose-700", bgColor: "bg-rose-50 border-rose-200" };
 }
 
-// Check if entry is within 2-hour edit window
+// Allow editing/correcting BP entries
 function canEditEntry(createdAt: string): boolean {
-  const created = new Date(createdAt).getTime();
-  const now = Date.now();
-  return now - created < 2 * 60 * 60 * 1000; // 2 hours
+  return Boolean(createdAt);
 }
 
 type ChartRange = "7d" | "30d" | "3m" | "6m" | "1y";
