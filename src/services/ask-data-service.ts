@@ -330,6 +330,17 @@ export function planQueryFromQuestion(question: string): ParsedQueryPlan {
   };
 }
 
+import { executeAskPipeline, type AskResponseContract } from "./ask-orchestrator-service";
+
+export { executeAskPipeline, type AskResponseContract };
+
+export async function answerHealthQuestionContract(
+  patientId: string,
+  question: string
+): Promise<AskResponseContract> {
+  return executeAskPipeline(patientId, question);
+}
+
 /**
  * Execute Safe Structured Query Operations & Generate Explainable Answer Card
  */
@@ -337,6 +348,10 @@ export async function answerHealthQuestion(
   patientId: string,
   question: string
 ): Promise<AskDataAnswerCard> {
+  const contract = await executeAskPipeline(patientId, question);
+  if (contract.cards.length > 0) {
+    return contract.cards[0] as unknown as AskDataAnswerCard;
+  }
   const card = await _answerHealthQuestionInternal(patientId, question);
   return attachHealthSolution(card);
 }

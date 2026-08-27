@@ -29,8 +29,13 @@ import {
 } from "@/services/patient-service";
 import {
   answerHealthQuestion,
+  executeAskPipeline,
   type ChatMessageItem,
+  type AskResponseContract,
 } from "@/services/ask-data-service";
+import { AskUnderstandingStrip } from "@/components/ask/ask-understanding-strip";
+import { AskDeveloperTracePanel } from "@/components/ask/ask-developer-trace-panel";
+import { AskFollowUpChips } from "@/components/ask/ask-followup-chips";
 
 const QUICK_PROMPTS = [
   "आज पापा कैसे रहे?",
@@ -109,6 +114,9 @@ export default function AskSwasthTrackPage() {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [contractMap, setContractMap] = useState<Record<string, AskResponseContract>>({});
+
   async function handleSendQuestion(textToSend?: string) {
     const query = (textToSend || inputQuery).trim();
     if (!query || !patient || loading) return;
@@ -130,13 +138,22 @@ export default function AskSwasthTrackPage() {
     setLoading(true);
 
     try {
-      const card = await answerHealthQuestion(patient.id, query);
+      const contract = await executeAskPipeline(patient.id, query);
+      const card = (contract.cards[0] || (await answerHealthQuestion(patient.id, query))) as unknown as ChatMessageItem["card"];
+
+      const ansMsgId = getNextMessageId("msg-ans");
+      setContractMap((prev) => ({ ...prev, [ansMsgId]: contract }));
+
       const assistantMsg: ChatMessageItem = {
-        id: getNextMessageId("msg-ans"),
+        id: ansMsgId,
         role: "assistant",
-        content: card.summaryHi,
+        content: contract.answer_text,
         card,
-        timestamp: card.timestamp,
+        timestamp: new Date().toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }),
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
@@ -210,18 +227,33 @@ export default function AskSwasthTrackPage() {
         </div>
 
         {/* Patient Switcher */}
-        <div className="relative self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
-            onClick={() => setIsPatientDropdownOpen(!isPatientDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs font-black text-slate-800 transition-colors cursor-pointer"
+            onClick={() => setIsDevMode(!isDevMode)}
+            className={cn(
+              "px-2.5 py-1.5 rounded-xl border text-xs font-black transition-colors cursor-pointer flex items-center gap-1",
+              isDevMode
+                ? "bg-slate-900 text-emerald-400 border-slate-800"
+                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+            )}
+            title="Toggle Developer Execution Trace Panel"
           >
-            <UserCheck className="h-3.5 w-3.5 text-purple-600 shrink-0" />
-            <span className="truncate max-w-[150px]">
-              Viewing: {isPapa ? "पापा" : patient?.name || "Patient"}
-            </span>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+            <span>{isDevMode ? "🛠️ Dev Trace: ON" : "🛠️ Dev Trace: OFF"}</span>
           </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsPatientDropdownOpen(!isPatientDropdownOpen)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs font-black text-slate-800 transition-colors cursor-pointer"
+            >
+              <UserCheck className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+              <span className="truncate max-w-[150px]">
+                Viewing: {isPapa ? "पापा" : patient?.name || "Patient"}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+            </button>
 
           {isPatientDropdownOpen && (
             <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
@@ -263,6 +295,7 @@ export default function AskSwasthTrackPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {/* 2. QUICK QUESTION CHIPS (§39 - Contained horizontal scroll only) */}
@@ -548,6 +581,30 @@ export default function AskSwasthTrackPage() {
                     </div>
                   )}
                 </DepthCard>
+
+                {/* Understanding Strip (§2, §41) */}
+                {contractMap[msg.id] && (
+                  <AskUnderstandingStrip
+                    patientLabel={contractMap[msg.id].patient.label}
+                    resolvedDate={contractMap[msg.id].date_range?.end}
+                    metricLabel={contractMap[msg.id].intent}
+                    understandingConfidence={contractMap[msg.id].confidence.understanding}
+                  />
+                )}
+
+                {/* Follow-up Chips (§2) */}
+                {contractMap[msg.id]?.follow_up_suggestions && (
+                  <AskFollowUpChips
+                    suggestions={contractMap[msg.id].follow_up_suggestions}
+                    onSelectSuggestion={(txt) => handleSendQuestion(txt)}
+                    disabled={loading}
+                  />
+                )}
+
+                {/* Developer Execution Trace Panel (§17) */}
+                {isDevMode && contractMap[msg.id]?.trace && (
+                  <AskDeveloperTracePanel trace={contractMap[msg.id].trace} />
+                )}
               </div>
             </div>
           );

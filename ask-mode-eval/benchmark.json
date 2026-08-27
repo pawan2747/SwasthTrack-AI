@@ -1,0 +1,373 @@
+[
+  {
+    "id": "hindi-001",
+    "category": "hindi",
+    "input": "आज पापा कैसे रहे?",
+    "expected_intent": "PATIENT_TODAY_OVERALL_SUMMARY",
+    "expected_operation": "Multimodal Daily Health Brief Engine",
+    "expected_facts": ["आज का स्वास्थ & रूटीन स्कोर"]
+  },
+  {
+    "id": "hindi-002",
+    "category": "hindi",
+    "input": "आज का ब्लड प्रेशर कितना है?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["ब्लड प्रेशर"]
+  },
+  {
+    "id": "hindi-003",
+    "category": "hindi",
+    "input": "कल की दवाइयाँ ली थीं?",
+    "expected_intent": "MEDICINE_ADHERENCE",
+    "expected_operation": "get_medicine_adherence",
+    "expected_facts": ["दवा"]
+  },
+  {
+    "id": "hindi-004",
+    "category": "hindi",
+    "input": "आज कितने कदम चले?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["कदम"]
+  },
+  {
+    "id": "hindi-005",
+    "category": "hindi",
+    "input": "वजन कितना दर्ज है?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["वजन"]
+  },
+  {
+    "id": "hindi-006",
+    "category": "hindi",
+    "input": "नींद कैसी रही?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["नींद"]
+  },
+  {
+    "id": "hindi-007",
+    "category": "hindi",
+    "input": "भोजन में क्या खाया था?",
+    "expected_intent": "FOOD_SUMMARY",
+    "expected_operation": "get_food_history",
+    "expected_facts": ["भोजन"]
+  },
+  {
+    "id": "hindi-008",
+    "category": "hindi",
+    "input": "स्वास्थ स्कोर क्या है?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["स्कोर"]
+  },
+  {
+    "id": "hindi-009",
+    "category": "hindi",
+    "input": "पिछले 7 दिन का औसत BP क्या था?",
+    "expected_intent": "AVERAGE",
+    "expected_operation": "get_metric_average",
+    "expected_facts": ["औसत"]
+  },
+  {
+    "id": "hindi-010",
+    "category": "hindi",
+    "input": "इस हफ्ते क्या बदलाव हुआ?",
+    "expected_intent": "WHAT_CHANGED",
+    "expected_operation": "compare_periods",
+    "expected_facts": ["बदलाव"]
+  },
+  {
+    "id": "hindi-011",
+    "category": "hindi",
+    "input": "क्या कोई दवा छूटी?",
+    "expected_intent": "MEDICINE_ADHERENCE",
+    "expected_operation": "get_medicine_adherence",
+    "expected_facts": ["दवा"]
+  },
+  {
+    "id": "hindi-012",
+    "category": "hindi",
+    "input": "डिनर में क्या खाया?",
+    "expected_intent": "FOOD_SUMMARY",
+    "expected_operation": "get_food_history",
+    "expected_facts": ["डिनर"]
+  },
+  {
+    "id": "hindi-013",
+    "category": "hindi",
+    "input": "नाश्ते की कैलोरी कितनी थी?",
+    "expected_intent": "FOOD_SUMMARY",
+    "expected_operation": "get_food_history",
+    "expected_facts": ["कैलोरी"]
+  },
+  {
+    "id": "hindi-014",
+    "category": "hindi",
+    "input": "कल शाम का BP क्या था?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["BP"]
+  },
+  {
+    "id": "hindi-015",
+    "category": "hindi",
+    "input": "आज का रूटीन स्कोर कितना है?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["रूटीन"]
+  },
+
+  {
+    "id": "english-001",
+    "category": "english",
+    "input": "What was Papa's blood pressure today?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["BP"]
+  },
+  {
+    "id": "english-002",
+    "category": "english",
+    "input": "How many steps walked today?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["steps"]
+  },
+  {
+    "id": "english-003",
+    "category": "english",
+    "input": "Were all medicines taken today?",
+    "expected_intent": "MEDICINE_ADHERENCE",
+    "expected_operation": "get_medicine_adherence",
+    "expected_facts": ["medicine"]
+  },
+  {
+    "id": "english-004",
+    "category": "english",
+    "input": "What is current weight?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["weight"]
+  },
+  {
+    "id": "english-005",
+    "category": "english",
+    "input": "Average BP for last 7 days",
+    "expected_intent": "AVERAGE",
+    "expected_operation": "get_metric_average",
+    "expected_facts": ["average"]
+  },
+  {
+    "id": "english-006",
+    "category": "english",
+    "input": "Sleep hours last night",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["sleep"]
+  },
+  {
+    "id": "english-007",
+    "category": "english",
+    "input": "Food logged for breakfast",
+    "expected_intent": "FOOD_SUMMARY",
+    "expected_operation": "get_food_history",
+    "expected_facts": ["breakfast"]
+  },
+  {
+    "id": "english-008",
+    "category": "english",
+    "input": "What changed this week?",
+    "expected_intent": "WHAT_CHANGED",
+    "expected_operation": "compare_periods",
+    "expected_facts": ["changed"]
+  },
+  {
+    "id": "english-009",
+    "category": "english",
+    "input": "Wellness score today",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["wellness"]
+  },
+  {
+    "id": "english-010",
+    "category": "english",
+    "input": "Any missing medicine dose?",
+    "expected_intent": "MEDICINE_ADHERENCE",
+    "expected_operation": "get_medicine_adherence",
+    "expected_facts": ["medicine"]
+  },
+  {
+    "id": "english-011",
+    "category": "english",
+    "input": "Distance covered today",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["distance"]
+  },
+  {
+    "id": "english-012",
+    "category": "english",
+    "input": "Calories consumed today",
+    "expected_intent": "FOOD_SUMMARY",
+    "expected_operation": "get_food_history",
+    "expected_facts": ["calories"]
+  },
+  {
+    "id": "english-013",
+    "category": "english",
+    "input": "Morning BP reading",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["BP"]
+  },
+  {
+    "id": "english-014",
+    "category": "english",
+    "input": "Evening BP reading",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["BP"]
+  },
+  {
+    "id": "english-015",
+    "category": "english",
+    "input": "Overview of today's health",
+    "expected_intent": "PATIENT_TODAY_OVERALL_SUMMARY",
+    "expected_operation": "Multimodal Daily Health Brief Engine",
+    "expected_facts": ["Overview"]
+  },
+
+  {
+    "id": "hinglish-001",
+    "category": "hinglish",
+    "input": "Papa ka bp kal kitna tha?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["BP"]
+  },
+  {
+    "id": "hinglish-002",
+    "category": "hinglish",
+    "input": "Is week Papa ne kitne steps chale?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["steps"]
+  },
+  {
+    "id": "hinglish-003",
+    "category": "hinglish",
+    "input": "Papa ki medicine adherence kitni rahi?",
+    "expected_intent": "MEDICINE_ADHERENCE",
+    "expected_operation": "get_medicine_adherence",
+    "expected_facts": ["dawa"]
+  },
+  {
+    "id": "hinglish-004",
+    "category": "hinglish",
+    "input": "Pichhle 7 din ka average BP kya tha?",
+    "expected_intent": "AVERAGE",
+    "expected_operation": "get_metric_average",
+    "expected_facts": ["BP"]
+  },
+  {
+    "id": "hinglish-005",
+    "category": "hinglish",
+    "input": "Kal Papa ne kya khaya?",
+    "expected_intent": "FOOD_SUMMARY",
+    "expected_operation": "get_food_history",
+    "expected_facts": ["khaya"]
+  },
+  {
+    "id": "hinglish-006",
+    "category": "hinglish",
+    "input": "Is mahine activity kaisi rahi?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["activity"]
+  },
+  {
+    "id": "hinglish-007",
+    "category": "hinglish",
+    "input": "Last week se kya change hua?",
+    "expected_intent": "WHAT_CHANGED",
+    "expected_operation": "compare_periods",
+    "expected_facts": ["change"]
+  },
+  {
+    "id": "hinglish-008",
+    "category": "hinglish",
+    "input": "Papa ka weight pichhle 30 din mein kitna badla?",
+    "expected_intent": "WHAT_CHANGED",
+    "expected_operation": "compare_periods",
+    "expected_facts": ["weight"]
+  },
+  {
+    "id": "hinglish-009",
+    "category": "hinglish",
+    "input": "Raat ko neend kitni der aayi?",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["neend"]
+  },
+  {
+    "id": "hinglish-010",
+    "category": "hinglish",
+    "input": "Aaj ka nashta kya tha?",
+    "expected_intent": "FOOD_SUMMARY",
+    "expected_operation": "get_food_history",
+    "expected_facts": ["nashta"]
+  },
+
+  {
+    "id": "translit-001",
+    "category": "transliteration",
+    "input": "Papa ka wajan kitna h",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["wajan"]
+  },
+  {
+    "id": "typo-001",
+    "category": "typos",
+    "input": "Papa ka beepee kal kya tha",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["beepee"]
+  },
+  {
+    "id": "date-001",
+    "category": "relative_dates",
+    "input": "Kal ka BP kya tha",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["Kal"]
+  },
+  {
+    "id": "date-002",
+    "category": "explicit_dates",
+    "input": "27 August 2026 ko BP kya tha",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["27 August"]
+  },
+  {
+    "id": "no-data-001",
+    "category": "no_data",
+    "input": "1 January 2020 ko steps kitne the",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["1 January"]
+  },
+  {
+    "id": "auth-001",
+    "category": "authorization",
+    "input": "Unknown patient ka BP dikhao",
+    "expected_intent": "GET_VALUE_ON_DATE",
+    "expected_operation": "get_metric_on_date",
+    "expected_facts": ["BP"]
+  }
+]
