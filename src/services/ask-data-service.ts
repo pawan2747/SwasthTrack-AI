@@ -12,8 +12,10 @@ import {
 import { getHealthChanges } from "./what-changed-service";
 import { calculateDailyWellnessScore } from "./wellness-score-service";
 import { getHealthTimelineEvents } from "./timeline-service";
+import { getCaregiverDailyBrief } from "./caregiver-intelligence-service";
 
 export type QuestionIntent =
+  | "PATIENT_TODAY_OVERALL_SUMMARY"
   | "CURRENT_VALUE"
   | "HISTORICAL_VALUE"
   | "COMPARISON"
@@ -264,7 +266,17 @@ export function planQueryFromQuestion(question: string): ParsedQueryPlan {
 
   // 3. INTENT CLASSIFICATION
   if (intents.length === 0) {
-    if (q.includes("what changed") || q.includes("kya badla") || q.includes("kya change") || q.includes("difference kya")) {
+    if (
+      q.includes("kese rahe") ||
+      q.includes("kaise rahe") ||
+      q.includes("kaisa raha") ||
+      q.includes("kaisa tha") ||
+      q.includes("today summary") ||
+      q.includes("aaj papa") ||
+      q.includes("kaisa raha aaj")
+    ) {
+      intents.push("PATIENT_TODAY_OVERALL_SUMMARY");
+    } else if (q.includes("what changed") || q.includes("kya badla") || q.includes("kya change") || q.includes("difference kya")) {
       intents.push("WHAT_CHANGED");
     } else if (q.includes("missing") || q.includes("chhoot gaya") || q.includes("baki hai") || q.includes("nahi log")) {
       intents.push("MISSING_DATA");
@@ -378,6 +390,47 @@ async function _answerHealthQuestionInternal(
         calculationMethodHi: "गैर-चिकित्सीय सुरक्षा नियम",
         relatedActionUrl: "/health",
         relatedActionLabelHi: "वाइटल्स हिस्ट्री देखें",
+      },
+      timestamp: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
+    };
+  }
+
+  // 2.5 OVERALL DAILY HEALTH SUMMARY ("आज पापा कैसे रहे?")
+  if (
+    plan.intents.includes("PATIENT_TODAY_OVERALL_SUMMARY") ||
+    question.toLowerCase().includes("kese rahe") ||
+    question.toLowerCase().includes("kaise rahe") ||
+    question.toLowerCase().includes("kaisa raha")
+  ) {
+    const brief = await getCaregiverDailyBrief(pid);
+
+    return {
+      id: `ans-${Date.now()}`,
+      question,
+      intent: "PATIENT_TODAY_OVERALL_SUMMARY",
+      summaryHi: brief.naturalLanguageSummaryHi,
+      mainMetric: {
+        labelHi: "आज का स्वास्थ & रूटीन स्कोर",
+        value: `${brief.routineScore} / 100 (${brief.routineStatusHi})`,
+        subvalue: `दर्ज प्रविष्टियाँ: ${brief.recordedItemsCount}/${brief.expectedItemsCount} (${brief.completenessPercent}%)`,
+      },
+      bullets: [
+        `❤️ रक्तचाप (BP): ${brief.snapshot.bp.value}`,
+        `💊 दवाइयाँ: ${brief.snapshot.medicines.value}`,
+        `🥗 भोजन / कैलोरी: ${brief.snapshot.food.value}`,
+        `👟 कदम (Steps): ${brief.snapshot.activity.value}`,
+        `😴 नींद (Sleep): ${brief.snapshot.sleep.value}`,
+        `⚖️ वजन (Weight): ${brief.snapshot.weight.value}`,
+      ],
+      healthSolutionHi: "💡 स्वास्थ्य सलाह & उपाय: शाम की 30 मिनट हल्की वॉक करें, रात 8:00 बजे तक सुपाच्य भोजन लें और निर्धारित दवाइयों को सही समय पर लें।",
+      evidence: {
+        recordsEvaluated: brief.recordedItemsCount,
+        dataThroughDate: brief.dateStr,
+        confidence: "High",
+        calculationMethod: "Multimodal Daily Health Brief Engine",
+        calculationMethodHi: "दैनिक समग्र स्वास्थ्य व रूटीन विश्लेषण",
+        relatedActionUrl: "/caregiver",
+        relatedActionLabelHi: "केयरगिवर ब्रीफ देखें",
       },
       timestamp: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
     };

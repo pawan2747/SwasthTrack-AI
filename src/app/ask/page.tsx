@@ -334,7 +334,9 @@ export default function AskSwasthTrackPage() {
                         }
                         className="text-[11px] font-black"
                       >
-                        {card.intent === "CURRENT_VALUE"
+                        {card.intent === "PATIENT_TODAY_OVERALL_SUMMARY"
+                          ? "आज का दैनिक स्वास्थ्य (Daily Brief)"
+                          : card.intent === "CURRENT_VALUE"
                           ? "नवीनतम स्थिति (Current)"
                           : card.intent === "WHAT_CHANGED"
                           ? "स्वास्थ्य में बदलाव (What Changed)"
