@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardDescription,
@@ -96,6 +97,28 @@ export function DashboardSections({
       taken_time: new Date().toISOString(),
       status: evalRes.computedStatus,
       notes: evalRes.isLate ? "Auto-Late Evaluation: Taken past schedule window" : null,
+    });
+    onRefresh();
+  }
+
+  async function handleMarkMedicineMissed(medicine: MedicineItem) {
+    const todayLogs = data.todayMedicineLogs || [];
+    const logItem = todayLogs.find((l) => l.medicine_id === medicine.id);
+
+    if (logItem && logItem.status === "missed") {
+      await deleteMedicineLog(logItem.id);
+      onRefresh();
+      return;
+    }
+
+    const todayStr = getTodayDateString();
+    await logMedicineStatus({
+      medicine_id: medicine.id,
+      patient_id: patient.id,
+      scheduled_time: `${todayStr}T${medicine.scheduled_time}`,
+      taken_time: null,
+      status: "missed",
+      notes: "User explicitly marked Missed via Dashboard",
     });
     onRefresh();
   }
@@ -267,27 +290,47 @@ export function DashboardSections({
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-1 sm:pt-0 shrink-0">
+                      <div className="flex items-center gap-1.5 pt-1 sm:pt-0 shrink-0">
+                        {/* Option 1: Taken (Auto evaluates on-time vs late) */}
                         <button
                           type="button"
                           onClick={() => handleMarkMedicine(medicine)}
-                          className={`min-h-10 rounded-xl border-2 px-3.5 py-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer active:scale-98 shadow-xs ${
+                          className={cn(
+                            "min-h-9 px-3 py-1 rounded-xl border-2 text-xs font-black transition-all cursor-pointer active:scale-98 shadow-xs flex items-center gap-1",
                             currentStatus === "taken"
-                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              ? "border-emerald-600 bg-emerald-600 text-white font-black"
                               : currentStatus === "late"
-                              ? "border-amber-500 bg-amber-500 text-white"
-                              : currentStatus === "missed"
-                              ? "border-rose-400 bg-rose-50 text-rose-900 font-black hover:bg-emerald-50"
-                              : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-md"
-                          }`}
+                              ? "border-amber-500 bg-amber-500 text-white font-black"
+                              : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-sm",
+                          )}
                         >
-                          {currentStatus === "taken"
-                            ? "✓ Taken On Time (समय पर ली गई)"
-                            : currentStatus === "late"
-                            ? "⏳ Taken Late (देर से ली गई)"
-                            : currentStatus === "missed"
-                            ? "✗ Missed (4+h बीत गए - अब दर्ज करें)"
-                            : "✓ Taken (ली गई)"}
+                          <span>✓</span>
+                          <span>
+                            {currentStatus === "taken"
+                              ? "✓ Taken (ली)"
+                              : currentStatus === "late"
+                              ? "⏳ Late (देर से ली)"
+                              : "✓ Taken (ली)"}
+                          </span>
+                        </button>
+
+                        {/* Option 2: Missed */}
+                        <button
+                          type="button"
+                          onClick={() => handleMarkMedicineMissed(medicine)}
+                          className={cn(
+                            "min-h-9 px-3 py-1 rounded-xl border-2 text-xs font-black transition-all cursor-pointer active:scale-98 shadow-xs flex items-center gap-1",
+                            currentStatus === "missed"
+                              ? "border-rose-600 bg-rose-600 text-white font-black"
+                              : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-rose-50 hover:text-rose-800 hover:border-rose-300 font-bold",
+                          )}
+                        >
+                          <span>✕</span>
+                          <span>
+                            {currentStatus === "missed"
+                              ? "✕ Missed (छूट गई)"
+                              : "✕ Missed (छूट गई)"}
+                          </span>
                         </button>
                       </div>
                     </div>

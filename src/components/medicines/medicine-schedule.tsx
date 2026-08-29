@@ -139,6 +139,40 @@ export function MedicineSchedule({
     }
   }
 
+  async function handleMarkMissed(medicine: MedicineItem) {
+    const previousPending = new Map(pendingMarks);
+    setRollbackError(null);
+
+    setPendingMarks((prev) => {
+      const next = new Map(prev);
+      next.set(medicine.id, "missed");
+      return next;
+    });
+
+    setBulkSuccessMsg(`"${medicine.medicine_name}" को छूट गई (Missed) दर्ज किया गया।`);
+    setTimeout(() => setBulkSuccessMsg(null), 4500);
+
+    try {
+      const targetTime = `${selectedDate}T${medicine.scheduled_time}`;
+      await logMedicineStatus({
+        medicine_id: medicine.id,
+        patient_id: patientId,
+        scheduled_time: targetTime,
+        taken_time: null,
+        status: "missed",
+        notes: "User explicitly marked Missed",
+      });
+      const updated = await getMedicineLogsByDate(patientId, selectedDate);
+      setCurrentLogs(updated);
+      onRefresh();
+    } catch {
+      setPendingMarks(previousPending);
+      setRollbackError("Update save नहीं हो पाया। पुनः प्रयास करें।");
+      setTimeout(() => setRollbackError(null), 5000);
+      onRefresh();
+    }
+  }
+
   // Unmark / Reset an entry
   async function handleUnmark(medicine: MedicineItem) {
     const existingLog = currentLogs.find((l) => l.medicine_id === medicine.id);
@@ -413,29 +447,45 @@ export function MedicineSchedule({
                             </div>
 
                             <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                              {/* Option 1: Taken (Auto evaluates on-time vs late) */}
                               <button
                                 type="button"
                                 onClick={() => handleMarkAuto(medicine)}
                                 className={cn(
-                                  "flex-1 min-h-12 rounded-xl border-2 px-4 text-xs sm:text-base font-black transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-xs",
+                                  "flex-1 min-h-11 rounded-xl border-2 px-3 text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 shadow-xs",
                                   currentStatus === "taken"
                                     ? statusStyles.taken
                                     : currentStatus === "late"
                                     ? statusStyles.late
-                                    : currentStatus === "missed"
-                                    ? "border-rose-400 bg-rose-50 text-rose-900 font-black hover:bg-emerald-50 hover:text-emerald-900"
                                     : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-md",
                                 )}
                               >
                                 <span>✓</span>
                                 <span>
                                   {currentStatus === "taken"
-                                    ? "✓ Taken On Time (समय पर ली गई)"
+                                    ? "✓ Taken (ली गई)"
                                     : currentStatus === "late"
-                                    ? "⏳ Taken Late (देर से ली गई)"
-                                    : currentStatus === "missed"
-                                    ? "✗ Missed (4+h बीत गए - अब दर्ज करें)"
+                                    ? "⏳ Late (देर से ली गई)"
                                     : "✓ Taken (ली गई)"}
+                                </span>
+                              </button>
+
+                              {/* Option 2: Missed */}
+                              <button
+                                type="button"
+                                onClick={() => handleMarkMissed(medicine)}
+                                className={cn(
+                                  "flex-1 min-h-11 rounded-xl border-2 px-3 text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 shadow-xs",
+                                  currentStatus === "missed"
+                                    ? statusStyles.missed
+                                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-rose-50 hover:text-rose-800 hover:border-rose-300 font-bold",
+                                )}
+                              >
+                                <span>✕</span>
+                                <span>
+                                  {currentStatus === "missed"
+                                    ? "✕ Missed (छूट गई)"
+                                    : "✕ Missed (छूट गई)"}
                                 </span>
                               </button>
                             </div>

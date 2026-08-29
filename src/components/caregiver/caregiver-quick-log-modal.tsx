@@ -165,6 +165,28 @@ export function CaregiverQuickLogModal({
     }
   }
 
+  async function handleMarkMedicineMissed(med: MedicineItem) {
+    setSubmitting(true);
+    try {
+      const todayStr = getTodayDateString();
+      await logMedicineStatus({
+        patient_id: patientId,
+        medicine_id: med.id,
+        status: "missed",
+        scheduled_time: `${todayStr}T${med.scheduled_time}`,
+        taken_time: null,
+        notes: "Caregiver marked Missed",
+      });
+      invalidateCaregiverCache(patientId);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      console.error("Med mark missed error:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
       <div
@@ -348,16 +370,27 @@ export function CaregiverQuickLogModal({
                         {m.dose} · {m.scheduled_time} {m.meal_relation ? `(${m.meal_relation})` : ""}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => handleMarkMedicineTaken(m)}
-                      variant="primary"
-                      className="text-xs py-1.5 px-3 min-h-8"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                      Taken ✓
-                    </Button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => handleMarkMedicineTaken(m)}
+                        variant="primary"
+                        className="text-xs py-1.5 px-2.5 min-h-8"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        Taken ✓
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => handleMarkMedicineMissed(m)}
+                        variant="secondary"
+                        className="text-xs py-1.5 px-2.5 min-h-8 text-rose-700 border-rose-200 hover:bg-rose-50"
+                      >
+                        Missed ✕
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}
