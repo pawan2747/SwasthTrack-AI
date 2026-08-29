@@ -278,6 +278,11 @@ export function QuickMarkMedicineDialog({
                   <div className="space-y-2.5">
                     {periodMeds.map((medicine) => {
                       const currentStatus = statusMap.get(medicine.id) || "pending";
+                      const logItem = logs.find((l) => l.medicine_id === medicine.id);
+                      const markedIso = logItem?.taken_time || logItem?.created_at;
+                      const markedTime = markedIso
+                        ? new Date(markedIso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+                        : null;
 
                       return (
                         <div
@@ -299,6 +304,12 @@ export function QuickMarkMedicineDialog({
                                 <span className="text-slate-300">·</span>
                                 <span className="text-slate-500">{medicine.frequency}</span>
                               </p>
+                              {markedTime && (
+                                <p className="text-[10px] font-black text-purple-900 bg-purple-100/90 px-2 py-0.5 rounded-md inline-flex items-center gap-1 border border-purple-200 mt-1">
+                                  <span>🕒</span>
+                                  <span>Marked at {markedTime}</span>
+                                </p>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-1 text-xs font-black text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">

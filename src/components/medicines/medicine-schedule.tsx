@@ -380,6 +380,11 @@ export function MedicineSchedule({
                 {periodMeds.length > 0 ? (
                   periodMeds.map((medicine) => {
                     const currentStatus = statusMap.get(medicine.id) || "pending";
+                    const existingLog = currentLogs.find((l) => l.medicine_id === medicine.id);
+                    const markedIso = existingLog?.taken_time || existingLog?.created_at;
+                    const markedTime = markedIso
+                      ? new Date(markedIso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+                      : null;
 
                     return (
                       <article
@@ -400,14 +405,27 @@ export function MedicineSchedule({
                                 {medicine.dose}
                               </span>
                               {currentStatus !== "pending" && (
-                                <span className={`text-[11px] font-black px-2 py-0.5 rounded-md ${
-                                  currentStatus === "taken"
-                                    ? "bg-emerald-100 text-emerald-800"
-                                    : currentStatus === "late"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-rose-100 text-rose-800"
-                                }`}>
-                                  स्थिति: {currentStatus.toUpperCase()}
+                                <span
+                                  className={`text-[11px] font-black px-2.5 py-0.5 rounded-md flex items-center gap-1.5 border ${
+                                    currentStatus === "taken"
+                                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                      : currentStatus === "late"
+                                      ? "bg-amber-100 text-amber-900 border-amber-300"
+                                      : "bg-rose-100 text-rose-900 border-rose-300"
+                                  }`}
+                                >
+                                  <span>
+                                    {currentStatus === "taken"
+                                      ? "✓ TAKEN (ली गई)"
+                                      : currentStatus === "late"
+                                      ? "⏳ LATE (देर से ली)"
+                                      : "✕ MISSED (छूट गई)"}
+                                  </span>
+                                  {markedTime && (
+                                    <span className="text-[10px] font-extrabold border-l border-slate-400 pl-1.5 ml-0.5 text-slate-900 bg-white/90 px-1.5 py-0.2 rounded shadow-2xs">
+                                      ⏰ Marked at {markedTime}
+                                    </span>
+                                  )}
                                 </span>
                               )}
                             </div>
