@@ -2280,7 +2280,7 @@ export function evaluateMedicineStatusAndMessage(
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
   // Rule 1: Morning empty stomach taken after 10:00 AM -> LATE
-  if (isMorningEmptyStomach && (actionHour >= 10 || diffMinutes > 120)) {
+  if (isMorningEmptyStomach && (actionHour >= 10 || diffMinutes > 180)) {
     return {
       computedStatus: "late",
       isLate: true,
@@ -2290,8 +2290,8 @@ export function evaluateMedicineStatusAndMessage(
     };
   }
 
-  // Rule 2: Any medicine taken > 2 hours (120 mins) past scheduled time -> LATE
-  if (diffMinutes > 120) {
+  // Rule 2: Any medicine taken > 3 hours (180 mins) past scheduled time -> LATE
+  if (diffMinutes > 180) {
     const hoursLate = (diffMinutes / 60).toFixed(1);
     return {
       computedStatus: "late",
