@@ -382,9 +382,15 @@ export function MedicineSchedule({
                     const currentStatus = statusMap.get(medicine.id) || "pending";
                     const existingLog = currentLogs.find((l) => l.medicine_id === medicine.id);
                     const markedIso = existingLog?.taken_time || existingLog?.created_at;
-                    const markedTime = markedIso
-                      ? new Date(markedIso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
-                      : null;
+                    let markedTime: string | null = null;
+                    if (markedIso) {
+                      try {
+                        const d = new Date(markedIso);
+                        if (!isNaN(d.getTime())) {
+                          markedTime = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+                        }
+                      } catch {}
+                    }
 
                     return (
                       <article
@@ -421,11 +427,6 @@ export function MedicineSchedule({
                                       ? "⏳ LATE (देर से ली)"
                                       : "✕ MISSED (छूट गई)"}
                                   </span>
-                                  {markedTime && (
-                                    <span className="text-[10px] font-extrabold border-l border-slate-400 pl-1.5 ml-0.5 text-slate-900 bg-white/90 px-1.5 py-0.2 rounded shadow-2xs">
-                                      ⏰ Marked at {markedTime}
-                                    </span>
-                                  )}
                                 </span>
                               )}
                             </div>
@@ -435,6 +436,26 @@ export function MedicineSchedule({
                               <span className="text-slate-400 font-normal">·</span>
                               <span className="text-slate-600 font-semibold">{medicine.frequency}</span>
                             </p>
+
+                            {/* MARKED TIME & SCHEDULED TIME HIGHLIGHT BANNER */}
+                            <div className="mt-2.5 pt-1.5 flex flex-wrap items-center gap-2 text-xs font-bold">
+                              <span className="bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 flex items-center gap-1.5 font-black">
+                                <Clock className="h-3.5 w-3.5 text-emerald-700" />
+                                <span>निर्धारित समय (Scheduled): {medicine.scheduled_time.slice(0, 5)}</span>
+                              </span>
+
+                              {markedTime ? (
+                                <span className="bg-purple-100 text-purple-950 px-2.5 py-1 rounded-lg border border-purple-300 flex items-center gap-1.5 font-black animate-in fade-in">
+                                  <span>🕒</span>
+                                  <span>मार्क समय (Marked Time): {markedTime}</span>
+                                </span>
+                              ) : currentStatus !== "pending" ? (
+                                <span className="bg-purple-100 text-purple-950 px-2.5 py-1 rounded-lg border border-purple-300 flex items-center gap-1.5 font-black animate-in fade-in">
+                                  <span>🕒</span>
+                                  <span>मार्क समय (Marked Time): हाल ही में दर्ज (Just Now)</span>
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
 
                           <div className="flex items-center gap-2 self-start shrink-0">

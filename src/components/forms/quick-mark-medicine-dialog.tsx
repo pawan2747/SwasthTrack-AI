@@ -304,10 +304,10 @@ export function QuickMarkMedicineDialog({
                                 <span className="text-slate-300">·</span>
                                 <span className="text-slate-500">{medicine.frequency}</span>
                               </p>
-                              {markedTime && (
-                                <p className="text-[10px] font-black text-purple-900 bg-purple-100/90 px-2 py-0.5 rounded-md inline-flex items-center gap-1 border border-purple-200 mt-1">
+                              {currentStatus !== "pending" && (
+                                <p className="text-[11px] font-black text-purple-950 bg-purple-100 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 border border-purple-300 mt-1 animate-in fade-in">
                                   <span>🕒</span>
-                                  <span>Marked at {markedTime}</span>
+                                  <span>मार्क समय (Marked Time): {markedTime || "हाल ही में दर्ज (Just Now)"}</span>
                                 </p>
                               )}
                             </div>

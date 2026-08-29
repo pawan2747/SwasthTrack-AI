@@ -288,10 +288,15 @@ export function DashboardSections({
                         <p className="text-xs font-bold text-slate-600">
                           ⏰ {medicine.scheduled_time.slice(0, 5)} · {medicine.meal_relation ? medicine.meal_relation.replace("_", " ") : "With water"}
                         </p>
-                        {logItem && (logItem.taken_time || logItem.created_at) && (
-                          <p className="text-[11px] font-black text-purple-900 bg-purple-100/90 px-2 py-0.5 rounded-md inline-flex items-center gap-1 border border-purple-200 mt-1">
+                        {currentStatus && (
+                          <p className="text-[11px] font-black text-purple-950 bg-purple-100 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1 border border-purple-300 mt-1 animate-in fade-in">
                             <span>🕒</span>
-                            <span>Marked at {new Date(logItem.taken_time || logItem.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}</span>
+                            <span>
+                              मार्क समय (Marked Time):{" "}
+                              {logItem?.taken_time || logItem?.created_at
+                                ? new Date(logItem.taken_time || logItem.created_at!).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+                                : "हाल ही में दर्ज (Just Now)"}
+                            </span>
                           </p>
                         )}
                       </div>
