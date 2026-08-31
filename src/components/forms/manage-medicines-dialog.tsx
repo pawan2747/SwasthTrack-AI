@@ -28,6 +28,7 @@ export function ManageMedicinesDialog({
   const [medicineToEdit, setMedicineToEdit] = useState<MedicineItem | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   async function loadData() {
     setLoading(true);
@@ -64,14 +65,14 @@ export function ManageMedicinesDialog({
   }, [isOpen, patientId]);
 
   async function handleDelete(id: string) {
-    if (!confirm("क्या आप इस दवाई को हटाना चाहते हैं?")) return;
+    setErrorMsg("");
     setDeletingId(id);
     try {
       await deleteMedicine(id);
       await loadData();
       onSuccess?.();
     } catch {
-      alert("दवाई हटाने में विफल। कृपया पुनः प्रयास करें।");
+      setErrorMsg("दवाई हटाने में विफल। कृपया पुनः प्रयास करें।");
     } finally {
       setDeletingId(null);
     }
@@ -88,6 +89,11 @@ export function ManageMedicinesDialog({
         maxWidth="lg"
       >
         <div className="space-y-4 max-w-full">
+          {errorMsg ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+              {errorMsg}
+            </div>
+          ) : null}
           {/* TOP ACTION BAR */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border-2 border-emerald-200 bg-emerald-50/70">
             <div className="flex items-center gap-2.5">

@@ -141,6 +141,17 @@ export default function ReportsPage() {
           )}
         </Card>
       )}
+
+      {/* Medical Disclaimer Banner */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-500 flex items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="h-4 w-4 text-slate-400 shrink-0" />
+          <span>स्वास्थट्रैक रिपोर्ट एक वेलनेस ट्रैकिंग रिकॉर्ड है, यह चिकित्सकीय सलाह या डॉक्टर के निदान का स्थान नहीं लेता है।</span>
+        </div>
+        <a href="/medical-disclaimer" className="font-bold text-emerald-700 hover:underline shrink-0">
+          Medical Disclaimer →
+        </a>
+      </div>
     </div>
   );
 }

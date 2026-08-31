@@ -375,10 +375,10 @@ export function CaregiverQuickLogModal({
                         type="button"
                         disabled={submitting}
                         onClick={() => handleMarkMedicineTaken(m)}
-                        variant="primary"
-                        className="text-xs py-1.5 px-2.5 min-h-8"
+                        variant="secondary"
+                        className="text-xs py-1.5 px-2.5 min-h-8 border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400 font-bold shadow-2xs"
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-slate-500" />
                         Taken ✓
                       </Button>
                       <Button

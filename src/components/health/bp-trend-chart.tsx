@@ -27,11 +27,11 @@ function formatTime(iso: string): string {
 }
 
 function getBPCategory(systolic: number, diastolic: number): { label: string; color: string } {
-  if (systolic < 90 || diastolic < 60) return { label: "Low", color: "#3b82f6" };
-  if (systolic <= 120 && diastolic <= 80) return { label: "Normal", color: "#22c55e" };
-  if (systolic <= 130 && diastolic <= 85) return { label: "High Normal", color: "#eab308" };
-  if (systolic <= 140 || diastolic <= 90) return { label: "Elevated", color: "#f97316" };
-  return { label: "High", color: "#ef4444" };
+  if (systolic >= 140 || diastolic >= 90) return { label: "High BP", color: "#ef4444" };
+  if (systolic >= 130 || diastolic >= 85) return { label: "Elevated", color: "#f97316" };
+  if (systolic >= 121 || diastolic >= 81) return { label: "Pre-Hypertension", color: "#eab308" };
+  if (systolic < 90 || diastolic < 60) return { label: "Low BP", color: "#3b82f6" };
+  return { label: "Normal", color: "#22c55e" };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

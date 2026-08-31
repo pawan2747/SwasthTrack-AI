@@ -1,10 +1,10 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   CalendarDays,
+  FlaskConical,
   History,
   MessageSquareText,
   Settings,
@@ -28,11 +28,12 @@ export function Header() {
       {/* MOBILE HEADER (Clear & Readable: ~54px height) */}
       <div className="flex h-14 items-center justify-between px-3.5 lg:hidden">
         {/* Left: Brand Logo + Patient Name */}
-        <Link href="/" className="flex items-center gap-2.5 min-w-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+        <Link href="/" className="flex items-center gap-2.5 min-w-0" aria-label="Go to Dashboard">
+          <Image
             src="/logo.jpg"
             alt="SwasthTrack"
+            width={36}
+            height={36}
             className="h-9 w-9 shrink-0 rounded-xl object-cover border border-slate-200 shadow-2xs"
           />
           <div className="min-w-0">
@@ -45,66 +46,84 @@ export function Header() {
           </div>
         </Link>
 
-        {/* Right: Quick Action Icons (Caregiver, Settings, Profile) */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right: Quick Action Icons (Timeline, Ask, Caregiver, Lab, Settings, Profile) */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <Link
             href="/timeline"
             title="स्वास्थ्य यात्रा (Timeline)"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+            aria-label="Timeline / स्वास्थ यात्रा"
+            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/timeline"
                 ? "border-emerald-600 bg-emerald-100 text-emerald-900 shadow-2xs"
                 : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <History className="h-4.5 w-4.5" />
+            <History className="h-4 w-4" />
           </Link>
 
           <Link
             href="/ask"
             title="Ask SwasthTrack (डेटा से पूछें)"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+            aria-label="Ask SwasthTrack"
+            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/ask"
                 ? "border-purple-600 bg-purple-100 text-purple-900 shadow-2xs"
                 : "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
             }`}
           >
-            <MessageSquareText className="h-4.5 w-4.5" />
+            <MessageSquareText className="h-4 w-4" />
+          </Link>
+
+          <Link
+            href="/simulation-lab"
+            title="Simulation Lab (सिमुलेशन लैब)"
+            aria-label="Simulation Lab / सिमुलेशन लैब"
+            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl border transition-colors ${
+              pathname === "/simulation-lab"
+                ? "border-indigo-600 bg-indigo-100 text-indigo-900 shadow-2xs"
+                : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            <FlaskConical className="h-4 w-4 text-indigo-700" />
           </Link>
 
           <Link
             href="/caregiver"
             title="Caregiver"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+            aria-label="Caregiver Portal"
+            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/caregiver"
                 ? "border-emerald-600 bg-emerald-100 text-emerald-900"
                 : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <UserCheck className="h-4.5 w-4.5" />
+            <UserCheck className="h-4 w-4" />
           </Link>
 
           <Link
             href="/settings"
             title="Settings"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+            aria-label="Settings / सेटिंग्स"
+            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/settings"
                 ? "border-emerald-600 bg-emerald-100 text-emerald-900"
                 : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <Settings className="h-4.5 w-4.5" />
+            <Settings className="h-4 w-4" />
           </Link>
 
           <Link
             href="/profile"
             title="Profile"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-colors ${
+            aria-label="Profile / प्रोफ़ाइल"
+            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl border transition-colors ${
               pathname === "/profile"
                 ? "border-emerald-600 bg-emerald-100 text-emerald-900"
                 : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <UserCircle className="h-4.5 w-4.5" />
+            <UserCircle className="h-4 w-4" />
           </Link>
         </div>
       </div>

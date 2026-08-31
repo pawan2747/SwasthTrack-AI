@@ -46,7 +46,7 @@ const statusStyles: Record<StatusType, string> = {
   taken: "border-emerald-500 bg-emerald-600 text-white font-black shadow-md ring-2 ring-emerald-600/30",
   late: "border-amber-500 bg-amber-500 text-white font-black shadow-md ring-2 ring-amber-500/30",
   missed: "border-rose-500 bg-rose-600 text-white font-black shadow-md ring-2 ring-rose-600/30",
-  pending: "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-bold",
+  pending: "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400 font-bold shadow-2xs",
 };
 
 function getMedicinePeriod(timeStr: string): "Morning" | "Afternoon" | "Evening" | "Night" {
@@ -227,6 +227,26 @@ export function MedicineSchedule({
     }
   }
 
+  // Reset all today logs so user can re-test clean white state
+  async function handleResetAllTodayLogs() {
+    const todayLogs = await getMedicineLogsByDate(patientId, selectedDate);
+    await Promise.all(todayLogs.map((l) => deleteMedicineLog(l.id)));
+    if (typeof window !== "undefined") {
+      try {
+        const stored = JSON.parse(localStorage.getItem("swasthtrack_medicine_logs") || "[]");
+        const filtered = Array.isArray(stored)
+          ? stored.filter((l: { scheduled_time?: string }) => !l.scheduled_time?.startsWith(selectedDate))
+          : [];
+        localStorage.setItem("swasthtrack_medicine_logs", JSON.stringify(filtered));
+      } catch {}
+    }
+    setPendingMarks(new Map());
+    setCurrentLogs([]);
+    onRefresh();
+    setBulkSuccessMsg(`इस तारीख (${selectedDate}) की सभी दवाइयाँ अनमार्क (Clean White State) कर दी गई हैं!`);
+    setTimeout(() => setBulkSuccessMsg(null), 4000);
+  }
+
   const activeMedsCount = medicines.filter((m) => m.active).length;
   const takenCount = medicines.filter(
     (m) => m.active && statusMap.get(m.id) === "taken"
@@ -339,14 +359,26 @@ export function MedicineSchedule({
                 इस तारीख की सभी {activeMedsCount} दवाइयाँ एक साथ ली गईं दर्ज करें
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleMarkAllTaken}
-              className="w-full sm:w-auto min-h-11 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
-            >
-              <CheckCheck className="h-4 w-4" />
-              ✓ सभी दवाइयाँ ली गईं (Mark All Taken)
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleMarkAllTaken}
+                className="flex-1 sm:flex-none min-h-11 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
+              >
+                <CheckCheck className="h-4 w-4" />
+                ✓ सभी दवाइयाँ ली गईं (Mark All)
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetAllTodayLogs}
+                className="min-h-11 px-3 rounded-xl border border-slate-300 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-800 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 transition-all cursor-pointer shrink-0"
+                title="आज की सभी एंट्री रीसेट / अनमार्क करें"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-rose-600" />
+                <span>Unmark All (रीसेट)</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -496,7 +528,7 @@ export function MedicineSchedule({
                                     ? statusStyles.taken
                                     : currentStatus === "late"
                                     ? statusStyles.late
-                                    : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-md",
+                                    : statusStyles.pending,
                                 )}
                               >
                                 <span>✓</span>
@@ -505,7 +537,7 @@ export function MedicineSchedule({
                                     ? "✓ Taken (ली गई)"
                                     : currentStatus === "late"
                                     ? "⏳ Late (देर से ली गई)"
-                                    : "✓ Taken (ली गई)"}
+                                    : "✓ Mark Taken (ली गई)"}
                                 </span>
                               </button>
 

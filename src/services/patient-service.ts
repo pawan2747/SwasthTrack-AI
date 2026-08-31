@@ -256,7 +256,7 @@ export const SEEDED_PAPA_MED_LOGS_26: MedicineLogEntry[] = PAPA_MEDICINES.map((m
 }));
 
 const STORAGE_VERSION_KEY = "swasthtrack_storage_version";
-const CURRENT_STORAGE_VERSION = "swasthtrack_v6_med_update";
+const CURRENT_STORAGE_VERSION = "swasthtrack_v7_clean_white_state";
 
 export function checkAndMigrateStorage(): void {
   if (typeof window !== "undefined") {
@@ -2459,7 +2459,7 @@ export async function getMedicineLogsByDate(
         .lte("scheduled_time", endOfDay)
         .order("scheduled_time", { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         existingLogs = data as unknown as MedicineLogEntry[];
       }
     } catch (err) {
@@ -2467,12 +2467,8 @@ export async function getMedicineLogsByDate(
     }
   }
 
-  // If date is 2026-08-26, return seeded 100% taken logs for Papa
-  if (targetDate === "2026-08-26") {
-    return SEEDED_PAPA_MED_LOGS_26;
-  }
-
-  if (existingLogs.length === 0) {
+  // Fallback to localStorage ONLY when Supabase is NOT configured
+  if (!isSupabaseConfigured) {
     const stored = getStorageItem<MedicineLogEntry[]>("swasthtrack_medicine_logs", []);
     existingLogs = stored.filter(
       (m) => m.patient_id === pid && m.scheduled_time.startsWith(targetDate),

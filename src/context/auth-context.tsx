@@ -15,6 +15,9 @@ import {
   getAuthorizedPatients,
   loginWithPhonePassword,
   registerUserWithPassword,
+  sendPasswordResetOtp,
+  verifyOtpAndResetPassword,
+  loginDemoUser,
   resetPasswordWithLast4Digits,
   signOut,
   type UserProfile,
@@ -29,7 +32,10 @@ interface AuthContextType {
   loading: boolean;
   login: (phone: string, password: string) => Promise<{ success: boolean; user: any; profile: UserProfile; isNewUser: boolean }>;
   register: (phone: string, password: string) => Promise<{ success: boolean; user: any; profile: UserProfile; isNewUser: boolean }>;
+  sendOtp: (phone: string) => Promise<{ success: boolean; message: string; simulatedOtp: string }>;
+  verifyOtp: (phone: string, otpCode: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   resetPassword: (phone: string, last4Digits: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
+  loginDemo: () => Promise<{ success: boolean; user: any; profile: UserProfile; isNewUser: boolean }>;
   logout: () => Promise<void>;
   setActivePatientId: (patientId: string) => void;
   refreshSession: () => Promise<void>;
@@ -68,42 +74,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-
-    getCurrentAuthSession()
-      .then(async (session) => {
-        if (!active) return;
-        if (session.user) {
-          setUser(session.user);
-          setProfile(session.profile);
-          const patients = await getAuthorizedPatients();
-          if (active) {
-            setAuthorizedPatients(patients);
-            if (patients.length > 0) {
-              setActivePatientId(patients[0].id);
-            }
-          }
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
-        if (active) setLoading(false);
-      })
-      .catch(() => {
-        if (active) setLoading(false);
-      });
+    const init = async () => {
+      if (active) await loadSession();
+    };
+    init();
 
     if (isSupabaseConfigured) {
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session?.user) {
+      } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session?.user && active) {
           loadSession();
-        } else if (event === "SIGNED_OUT") {
-          setUser(null);
-          setProfile(null);
         }
       });
-
       return () => {
         active = false;
         subscription.unsubscribe();
@@ -139,8 +122,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res;
   };
 
+  const sendOtp = async (phone: string) => {
+    return await sendPasswordResetOtp(phone);
+  };
+
+  const verifyOtp = async (phone: string, otpCode: string, newPassword: string) => {
+    return await verifyOtpAndResetPassword(phone, otpCode, newPassword);
+  };
+
   const resetPassword = async (phone: string, last4Digits: string, newPassword: string) => {
     return await resetPasswordWithLast4Digits(phone, last4Digits, newPassword);
+  };
+
+  const loginDemo = async () => {
+    const res = await loginDemoUser();
+    setUser(res.user);
+    setProfile(res.profile);
+    const patients = await getAuthorizedPatients();
+    setAuthorizedPatients(patients);
+    if (patients.length > 0) {
+      setActivePatientId(patients[0].id);
+    }
+    return res;
   };
 
   const logout = async () => {
@@ -160,7 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         login,
         register,
+        sendOtp,
+        verifyOtp,
         resetPassword,
+        loginDemo,
         logout,
         setActivePatientId,
         refreshSession: loadSession,

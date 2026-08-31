@@ -14,18 +14,20 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, register, resetPassword, user } = useAuth();
+  const { login, register, sendOtp, verifyOtp, loginDemo, user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"login" | "signup" | "forgot">("login");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [last4Digits, setLast4Digits] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
@@ -44,6 +46,8 @@ export default function LoginPage() {
     setActiveTab(tab);
     setError("");
     setSuccessMsg("");
+    setOtpSent(false);
+    setOtpCode("");
   }
 
   // Handle Login
@@ -62,6 +66,22 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       setError((err as Error).message || "लॉगिन विफल रहा। कृपया सही विवरण दर्ज करें।");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Handle Explicit Demo Login
+  async function handleDemoLogin() {
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      setLoading(true);
+      await loginDemo();
+      router.replace("/");
+    } catch (err: unknown) {
+      setError((err as Error).message || "डेमो मोड लॉगिन विफल रहा।");
     } finally {
       setLoading(false);
     }
@@ -93,15 +113,33 @@ export default function LoginPage() {
     }
   }
 
-  // Handle Forgot Password
-  async function handleForgotSubmit(e: FormEvent) {
+  // Request OTP
+  async function handleRequestOtp(e: FormEvent) {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
 
     try {
       setLoading(true);
-      const res = await resetPassword(phone, last4Digits, newPassword);
+      const res = await sendOtp(phone);
+      setOtpSent(true);
+      setSuccessMsg(res.message);
+    } catch (err: unknown) {
+      setError((err as Error).message || "OTP भेजने में विफल।");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Handle Verify OTP & Reset Password
+  async function handleVerifyOtpSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setSuccessMsg("");
+
+    try {
+      setLoading(true);
+      const res = await verifyOtp(phone, otpCode, newPassword);
       setSuccessMsg(res.message);
       setPassword(newPassword);
       setTimeout(() => {
@@ -120,10 +158,11 @@ export default function LoginPage() {
         {/* LOGO & TITLE */}
         <div className="text-center mb-6">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl overflow-hidden shadow-md shadow-emerald-700/15 border border-slate-100 bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src="/logo.jpg"
               alt="SwasthTrack Logo"
+              width={64}
+              height={64}
               className="h-full w-full object-cover"
             />
           </div>
@@ -336,14 +375,28 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* 3. FORGOT PASSWORD FORM (4-Digit Mobile Reset) */}
+        {/* DEMO MODE CTA BUTTON */}
+        {activeTab !== "forgot" && (
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              disabled={loading}
+              className="w-full py-2.5 px-4 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-98"
+            >
+              <span>⚡ बिना लॉगिन ऐप देखें (Try Demo Mode)</span>
+            </button>
+          </div>
+        )}
+
+        {/* 3. FORGOT PASSWORD FORM (6-Digit Secure OTP) */}
         {activeTab === "forgot" && (
-          <form onSubmit={handleForgotSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div className="flex items-center justify-between mb-1">
               <button
                 type="button"
                 onClick={() => handleTabSwitch("login")}
-                className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1"
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 वापस लॉगिन पर जाएं
@@ -353,80 +406,103 @@ export default function LoginPage() {
             <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-[11px] text-sky-900 font-medium space-y-1">
               <p className="font-bold flex items-center gap-1.5">
                 <KeyRound className="h-3.5 w-3.5 text-sky-600" />
-                आसान 4-Digit पासवर्ड रीसेट:
+                सुरक्षित 6-Digit OTP पासवर्ड रीसेट:
               </p>
               <p>
-                रजिस्टर्ड मोबाइल नंबर और उसके <strong>आखिरी 4 अंक</strong> दर्ज करके तुरंत नया पासवर्ड बनाएं।
+                रजिस्टर्ड मोबाइल नंबर पर 6-अंकों का OTP प्राप्त कर नया पासवर्ड बनाएं।
               </p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                रजिस्टर्ड मोबाइल नंबर (Mobile Number)
-              </label>
-              <div className="relative flex items-center">
-                <span className="absolute left-3.5 text-xs font-bold text-slate-500">
-                  +91
-                </span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  autoFocus
-                  placeholder="98765 43210"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 pl-12 pr-4 py-3 text-sm font-bold text-slate-900 tracking-wider placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                  required
-                />
-              </div>
-            </div>
+            {!otpSent ? (
+              <form onSubmit={handleRequestOtp} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    रजिस्टर्ड मोबाइल नंबर (Mobile Number)
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5 text-xs font-bold text-slate-500">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      autoFocus
+                      placeholder="98765 43210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-300 pl-12 pr-4 py-3 text-sm font-bold text-slate-900 tracking-wider placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                      required
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                मोबाइल के आखिरी 4 अंक (Last 4 Digits) *
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={4}
-                placeholder="e.g. 3210"
-                value={last4Digits}
-                onChange={(e) => setLast4Digits(e.target.value.replace(/\D/g, ""))}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-center text-lg font-black tracking-widest text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                required
-              />
-            </div>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={loading || phone.length < 10}
+                  className="w-full h-12 text-sm font-bold rounded-2xl shadow-sm shadow-emerald-700/20"
+                >
+                  {loading ? (
+                    "OTP भेजा जा रहा है..."
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      OTP कोड भेजें (Send OTP)
+                    </span>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    6-अंकों का OTP कोड (Enter 6-Digit OTP) *
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    autoFocus
+                    placeholder="e.g. 123456"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-center text-lg font-black tracking-widest text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    required
+                  />
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                नया पासवर्ड बनाएं (New Password) *
-              </label>
-              <input
-                type="password"
-                placeholder="नया पासवर्ड दर्ज करें"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-900 tracking-wider focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                required
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    नया पासवर्ड बनाएं (New Password) *
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="नया पासवर्ड दर्ज करें"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm font-bold text-slate-900 tracking-wider focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    required
+                  />
+                </div>
 
-            <Button
-              variant="primary"
-              type="submit"
-              disabled={loading || last4Digits.length !== 4 || !newPassword}
-              className="w-full h-12 text-sm font-bold rounded-2xl shadow-sm shadow-emerald-700/20"
-            >
-              {loading ? (
-                "रीसेट हो रहा है..."
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <KeyRound className="h-4 w-4" />
-                  पासवर्ड रीसेट करें (Reset Password)
-                </span>
-              )}
-            </Button>
-          </form>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={loading || otpCode.length !== 6 || !newPassword}
+                  className="w-full h-12 text-sm font-bold rounded-2xl shadow-sm shadow-emerald-700/20"
+                >
+                  {loading ? (
+                    "रीसेट हो रहा है..."
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <KeyRound className="h-4 w-4" />
+                      पासवर्ड रीसेट करें (Reset Password)
+                    </span>
+                  )}
+                </Button>
+              </form>
+            )}
+          </div>
         )}
 
         {/* TRUST BADGE */}

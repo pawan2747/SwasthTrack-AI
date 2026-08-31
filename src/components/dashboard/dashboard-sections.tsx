@@ -11,6 +11,7 @@ import {
   Scale,
   Utensils,
   Settings,
+  RotateCcw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,22 @@ export function DashboardSections({
     }
   }
 
+  async function handleResetAllMedicines() {
+    const todayLogs = data.todayMedicineLogs || [];
+    await Promise.all(todayLogs.map((l) => deleteMedicineLog(l.id)));
+    if (typeof window !== "undefined") {
+      try {
+        const todayStr = getTodayDateString();
+        const stored = JSON.parse(localStorage.getItem("swasthtrack_medicine_logs") || "[]");
+        const filtered = Array.isArray(stored)
+          ? stored.filter((l: { scheduled_time?: string }) => !l.scheduled_time?.startsWith(todayStr))
+          : [];
+        localStorage.setItem("swasthtrack_medicine_logs", JSON.stringify(filtered));
+      } catch {}
+    }
+    onRefresh();
+  }
+
   async function handleToggleChecklist(itemId: string, currentStatus: string) {
     const isCompleted = currentStatus === "completed";
     await toggleChecklistItem(itemId, !isCompleted);
@@ -252,14 +269,24 @@ export function DashboardSections({
             />
 
             {/* 1-TAP BULK MARK ALL TODAY'S MEDICINES */}
-            <div className="mt-3.5">
+            <div className="mt-3.5 flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleMarkAllMedicinesTaken}
-                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
                 <CheckCheck className="h-4 w-4" />
-                ✓ आज की सभी दवाइयाँ ले लीं (Mark All Taken)
+                ✓ सभी ली गईं (Mark All)
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetAllMedicines}
+                className="py-2.5 px-3 rounded-xl border border-slate-300 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-800 font-bold text-xs flex items-center justify-center gap-1 shadow-2xs active:scale-98 transition-all cursor-pointer shrink-0"
+                title="आज की सभी एंट्री रीसेट / अनमार्क करें"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-rose-600" />
+                <span>Unmark All</span>
               </button>
             </div>
 
@@ -309,10 +336,10 @@ export function DashboardSections({
                           className={cn(
                             "min-h-9 px-3 py-1 rounded-xl border-2 text-xs font-black transition-all cursor-pointer active:scale-98 shadow-xs flex items-center gap-1",
                             currentStatus === "taken"
-                              ? "border-emerald-600 bg-emerald-600 text-white font-black"
+                              ? "border-emerald-600 bg-emerald-600 text-white font-black shadow-md ring-2 ring-emerald-600/30"
                               : currentStatus === "late"
-                              ? "border-amber-500 bg-amber-500 text-white font-black"
-                              : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-sm",
+                              ? "border-amber-500 bg-amber-500 text-white font-black shadow-md ring-2 ring-amber-500/30"
+                              : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400 font-bold shadow-2xs",
                           )}
                         >
                           <span>✓</span>
@@ -321,7 +348,7 @@ export function DashboardSections({
                               ? "✓ Taken (ली)"
                               : currentStatus === "late"
                               ? "⏳ Late (देर से ली)"
-                              : "✓ Taken (ली)"}
+                              : "✓ Mark Taken (ली)"}
                           </span>
                         </button>
 

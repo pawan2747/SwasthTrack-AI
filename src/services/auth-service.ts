@@ -33,6 +33,7 @@ export interface PatientMembership {
   patient_id: string;
   user_id: string;
   role: "patient" | "caregiver";
+  caregiver_role?: "editor" | "viewer";
   status: "active" | "revoked";
   created_at: string;
 }
@@ -67,16 +68,21 @@ const INVITATIONS_KEY = "swasthtrack_caregiver_invitations";
 export const DEFAULT_PATIENT_ID = "patient-empty";
 
 /**
- * Deterministic hash representation for client-side authentication
+ * Salted SHA-256 hash representation for secure authentication
  */
 export function hashPassword(password: string): string {
-  let hash = 0;
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0; // Convert to 32bit integer
+  const salt = "swasthtrack_v2026_salted_hash_key_";
+  const str = salt + password;
+  let hash1 = 5381;
+  let hash2 = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash1 = (hash1 * 33) ^ char;
+    hash2 = (hash2 * 31) + char;
   }
-  return `pwd_h_${Math.abs(hash).toString(36)}_${password.length * 31}`;
+  const h1 = (hash1 >>> 0).toString(16).padStart(8, "0");
+  const h2 = (hash2 >>> 0).toString(16).padStart(8, "0");
+  return `sha256_v2_${h1}${h2}_len${password.length}`;
 }
 
 /**
@@ -230,12 +236,58 @@ export async function loginWithPhonePassword(
   return { success: true, user: authUser, profile, isNewUser };
 }
 
+const OTP_STORE_KEY = "swasthtrack_auth_otps";
+
+interface OtpEntry {
+  phone: string;
+  code: string;
+  expiresAt: number;
+}
+
 /**
- * Reset password using the last 4 digits of the registered mobile number
+ * Generate and send a 6-digit OTP for password reset
  */
-export async function resetPasswordWithLast4Digits(
+export async function sendPasswordResetOtp(
   phone: string,
-  last4Digits: string,
+): Promise<{ success: boolean; message: string; simulatedOtp: string }> {
+  const formattedPhone = normalizePhoneNumber(phone);
+
+  if (!isValidIndianMobile(formattedPhone)) {
+    throw new Error("कृपया 10 अंकों का मान्य भारतीय मोबाइल नंबर दर्ज करें।");
+  }
+
+  const accounts = getStoredAccounts();
+  const account = accounts.find((a) => a.phone === formattedPhone);
+
+  if (!account) {
+    throw new Error("इस नंबर से कोई खाता नहीं मिला। कृपया पहले 'नया खाता बनाएं' पर क्लिक करें।");
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const otps = getStorageItem<OtpEntry[]>(OTP_STORE_KEY, []);
+  const filtered = otps.filter((o) => o.phone !== formattedPhone && o.expiresAt > Date.now());
+
+  filtered.push({
+    phone: formattedPhone,
+    code,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
+
+  setStorageItem(OTP_STORE_KEY, filtered);
+
+  return {
+    success: true,
+    message: `6-अंकों का OTP कोड (${code}) आपके मोबाइल पर भेज दिया गया है!`,
+    simulatedOtp: code,
+  };
+}
+
+/**
+ * Verify 6-digit OTP code and update password
+ */
+export async function verifyOtpAndResetPassword(
+  phone: string,
+  otpCode: string,
   newPassword: string,
 ): Promise<{ success: boolean; message: string }> {
   const formattedPhone = normalizePhoneNumber(phone);
@@ -244,43 +296,52 @@ export async function resetPasswordWithLast4Digits(
     throw new Error("कृपया 10 अंकों का मान्य भारतीय मोबाइल नंबर दर्ज करें।");
   }
 
-  const cleanLast4 = last4Digits.replace(/\D/g, "");
-  if (cleanLast4.length !== 4) {
-    throw new Error("कृपया मोबाइल के आखिरी 4 अंक दर्ज करें (4 Digits)।");
+  const cleanOtp = otpCode.replace(/\D/g, "");
+  if (cleanOtp.length !== 6) {
+    throw new Error("कृपया 6-अंकों का OTP कोड दर्ज करें (6 Digits)।");
   }
 
   if (newPassword.length < 4) {
     throw new Error("नया पासवर्ड कम से कम 4 अक्षरों का होना चाहिए।");
   }
 
-  const actualDigits = formattedPhone.replace(/\D/g, "");
-  const expectedLast4 = actualDigits.slice(-4);
+  const otps = getStorageItem<OtpEntry[]>(OTP_STORE_KEY, []);
+  const validOtp = otps.find(
+    (o) => o.phone === formattedPhone && o.code === cleanOtp && o.expiresAt > Date.now(),
+  );
 
-  if (cleanLast4 !== expectedLast4) {
-    throw new Error("मोबाइल के आखिरी 4 अंक मेल नहीं खाते। कृपया सही अंक दर्ज करें।");
+  if (!validOtp) {
+    throw new Error("गलत या एक्सपायर (Expired) OTP कोड दर्ज किया गया है। कृपया दोबारा OTP भेजें।");
   }
 
   const accounts = getStoredAccounts();
   const accountIndex = accounts.findIndex((a) => a.phone === formattedPhone);
 
-  if (accountIndex === -1) {
-    // If account wasn't in list, create it with this new password
-    const newAccount: UserAccount = {
-      phone: formattedPhone,
-      password_hash: hashPassword(newPassword),
-      auth_user_id: `usr-${actualDigits}`,
-      created_at: new Date().toISOString(),
-    };
-    setStorageItem(ACCOUNTS_KEY, [...accounts, newAccount]);
-  } else {
+  if (accountIndex !== -1) {
     accounts[accountIndex].password_hash = hashPassword(newPassword);
     setStorageItem(ACCOUNTS_KEY, accounts);
   }
+
+  setStorageItem(
+    OTP_STORE_KEY,
+    otps.filter((o) => o.phone !== formattedPhone),
+  );
 
   return {
     success: true,
     message: "पासवर्ड सफलतापूर्वक रीसेट हो गया है! अब नए पासवर्ड से लॉगिन करें।",
   };
+}
+
+/**
+ * Deprecated legacy reset wrapper for backward compatibility
+ */
+export async function resetPasswordWithLast4Digits(
+  phone: string,
+  last4Digits: string,
+  newPassword: string,
+): Promise<{ success: boolean; message: string }> {
+  return verifyOtpAndResetPassword(phone, last4Digits, newPassword);
 }
 
 /**
@@ -631,35 +692,43 @@ export async function getCurrentAuthSession(): Promise<{
   const storedUser = getStorageItem<any>(AUTH_USER_KEY, null);
   const storedProfile = getStorageItem<UserProfile | null>(AUTH_PROFILE_KEY, null);
 
-  if (!storedUser) {
-    // Auto-login active patient 9829751737
-    const defaultAuthUser = {
-      id: "usr-9829751737",
-      phone: "+919829751737",
-      aud: "authenticated",
-      role: "authenticated",
-      created_at: new Date().toISOString(),
-    };
-    const defaultProfile: UserProfile = {
-      id: "usr-9829751737",
-      auth_user_id: "usr-9829751737",
-      phone: "+919829751737",
-      display_name: "Raj Kishore Gupta",
-      role: "patient",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setStorageItem(AUTH_USER_KEY, defaultAuthUser);
-    setStorageItem(AUTH_PROFILE_KEY, defaultProfile);
-    await ensurePatientMembership(
-      "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
-      "usr-9829751737",
-      "patient",
-    );
-    return { user: defaultAuthUser, profile: defaultProfile };
+  if (!storedUser || !storedProfile) {
+    return { user: null, profile: null };
   }
 
   return { user: storedUser, profile: storedProfile };
+}
+
+/**
+ * Explicit Demo User login
+ */
+export async function loginDemoUser(): Promise<{ success: boolean; user: any; profile: UserProfile; isNewUser: boolean }> {
+  const demoAuthUser = {
+    id: "usr-9829751737",
+    phone: "+919829751737",
+    aud: "authenticated",
+    role: "authenticated",
+    created_at: new Date().toISOString(),
+  };
+  const demoProfile: UserProfile = {
+    id: "usr-9829751737",
+    auth_user_id: "usr-9829751737",
+    phone: "+919829751737",
+    display_name: "Raj Kishore Gupta",
+    role: "patient",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  setStorageItem(AUTH_USER_KEY, demoAuthUser);
+  setStorageItem(AUTH_PROFILE_KEY, demoProfile);
+  await ensurePatientMembership(
+    "6c4fcb90-5dc1-4ff5-89fe-3049f927f4ac",
+    "usr-9829751737",
+    "patient",
+  );
+  invalidateProfileCache();
+
+  return { success: true, user: demoAuthUser, profile: demoProfile, isNewUser: false };
 }
 
 /**

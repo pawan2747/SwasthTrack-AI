@@ -87,6 +87,8 @@ export function AddWeightDialog({
             <input
               type="number"
               step="0.1"
+              min="2"
+              max="300"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
               className="w-36 text-center text-4xl sm:text-5xl font-black text-amber-950 bg-white border-2 border-amber-300 rounded-2xl py-1.5 focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-2xs"

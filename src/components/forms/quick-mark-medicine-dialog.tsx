@@ -28,7 +28,7 @@ const statusStyles: Record<StatusType, string> = {
   taken: "border-emerald-500 bg-emerald-600 text-white font-black shadow-md ring-2 ring-emerald-600/30",
   late: "border-amber-500 bg-amber-500 text-white font-black shadow-md ring-2 ring-amber-500/30",
   missed: "border-rose-500 bg-rose-600 text-white font-black shadow-md ring-2 ring-rose-600/30",
-  pending: "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-bold",
+  pending: "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400 font-bold shadow-2xs",
 };
 
 function getMedicinePeriod(timeStr: string): "Morning" | "Afternoon" | "Evening" | "Night" {
@@ -330,7 +330,7 @@ export function QuickMarkMedicineDialog({
                                   ? statusStyles.taken
                                   : currentStatus === "late"
                                   ? statusStyles.late
-                                  : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 font-black shadow-xs"
+                                  : statusStyles.pending,
                               )}
                             >
                               <span>✓</span>
@@ -339,7 +339,7 @@ export function QuickMarkMedicineDialog({
                                   ? "✓ Taken (ली)"
                                   : currentStatus === "late"
                                   ? "⏳ Late (देर से ली)"
-                                  : "✓ Taken (ली)"}
+                                  : "✓ Mark Taken (ली)"}
                               </span>
                             </button>
 

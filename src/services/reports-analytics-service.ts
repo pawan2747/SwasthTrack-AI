@@ -208,11 +208,11 @@ export async function getWeeklyReportData(
 
   const dailyScores = await Promise.all(dailyScoresPromises);
 
-  const daysTrackedCount = dailyScores.filter((d) => d.hasLogs || d.score > 30).length;
+  const daysTrackedCount = dailyScores.filter((d) => d.hasLogs).length;
   const hasSufficientData = daysTrackedCount >= 3;
 
   // Compute Averages
-  const scoredDays = dailyScores.filter((d) => d.hasLogs || d.score > 30);
+  const scoredDays = dailyScores.filter((d) => d.hasLogs);
   const averageScore =
     scoredDays.length > 0
       ? Math.round(scoredDays.reduce((sum, d) => sum + d.score, 0) / scoredDays.length)

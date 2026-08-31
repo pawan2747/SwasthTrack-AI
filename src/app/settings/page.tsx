@@ -48,6 +48,8 @@ import {
   type WeightUnit,
 } from "@/services/settings-service";
 import { resetQuickFoodPreferences } from "@/services/quick-food-service";
+import { exportAllDataAsCsv, exportAllDataAsJson } from "@/services/export-data-service";
+import { requestNotificationPermission, getNotificationPermissionStatus } from "@/services/notification-service";
 
 export default function SettingsPage() {
   const [patient, setPatient] = useState<PatientProfile | null>(null);
@@ -56,6 +58,19 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [notifPermission, setNotifPermission] = useState<string>(() =>
+    typeof window !== "undefined" ? getNotificationPermissionStatus() : "default"
+  );
+
+  async function handleEnablePushNotifs() {
+    const status = await requestNotificationPermission();
+    setNotifPermission(status);
+    if (status === "granted") {
+      setToastMessage("ब्राउज़र पुश नोटिफिकेशन चालू कर दिए गए हैं! 🔔");
+    } else if (status === "denied") {
+      setError("ब्राउज़र सेटिंग्स में नोटिफिकेशन ब्लॉक हैं।");
+    }
+  }
 
   // Editable Form States
   const [calorieTarget, setCalorieTarget] = useState("1600");
@@ -594,6 +609,61 @@ export default function SettingsPage() {
                 className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
             </label>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleEnablePushNotifs}
+                disabled={notifPermission === "granted"}
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all ${
+                  notifPermission === "granted"
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    : "bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 cursor-pointer shadow-2xs"
+                }`}
+              >
+                <Bell className="h-4 w-4" />
+                <span>
+                  {notifPermission === "granted"
+                    ? "✓ वेब पुश नोटिफिकेशन सक्रिय हैं (Web Notifications Active)"
+                    : "🔔 ब्राउज़र वेब नोटिफिकेशन चालू करें (Enable Web Notifications)"}
+                </span>
+              </button>
+            </div>
+          </div>
+        </Card>
+
+        {/* SECTION DATA EXPORT & BACKUP */}
+        <Card className="border-slate-200 bg-white p-5">
+          <CardHeader className="p-0 pb-4">
+            <div className="flex items-center gap-2">
+              <Download className="h-4 w-4 text-sky-600" />
+              <CardTitle className="text-sm font-bold text-slate-900">
+                Full Data Export & Backup (सम्पूर्ण डेटा बैकअप)
+              </CardTitle>
+            </div>
+            <CardDescription className="text-xs">
+              Download complete medical, BP, weight, food, and adherence logs.
+            </CardDescription>
+          </CardHeader>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => patient && exportAllDataAsCsv(patient.id)}
+              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 shadow-2xs active:scale-98 transition-all cursor-pointer"
+            >
+              <Download className="h-4 w-4 text-emerald-600" />
+              <span>CSV फ़ाइल डाउनलोड करें (Export CSV)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => patient && exportAllDataAsJson(patient.id)}
+              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 shadow-2xs active:scale-98 transition-all cursor-pointer"
+            >
+              <Download className="h-4 w-4 text-sky-600" />
+              <span>JSON फ़ाइल डाउनलोड करें (Export JSON)</span>
+            </button>
           </div>
         </Card>
 
