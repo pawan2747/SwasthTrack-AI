@@ -1,4 +1,5 @@
 import { getActivePatientId } from "@/lib/active-patient";
+import { doseDateOfLog, scheduledMinutes } from "@/lib/analytics/adherence";
 import {
   MEDICINE_LATE_AFTER_MIN,
   MEDICINE_MISSED_AFTER_MIN,
@@ -1655,7 +1656,7 @@ export async function getDashboardOverview(patientId?: string): Promise<Dashboar
   const pid = resolvePatientId(patientId);
   const today = todayIST();
 
-  const [profile, conditions, medicines, bpList, weightList, foodRange, actList, sleepList, medLogs, checklist] =
+  const [profile, conditions, medicines, bpList, weightList, foodRange, actList, sleepList, medLogsRaw, checklist] =
     await Promise.all([
       getPatientProfile(pid),
       getMedicalConditions(pid),
@@ -1666,7 +1667,9 @@ export async function getDashboardOverview(patientId?: string): Promise<Dashboar
       getFoodLogsInRange(pid, addDaysIST(today, -7), today),
       getActivityLogs(pid, 7),
       getSleepLogs(pid, 7),
-      getTodayMedicineLogs(pid),
+      // One day further than "today": older rows hold the schedule's wall-clock time as if it were
+      // UTC, so a late-evening dose of today sits on tomorrow in IST (and last night's sits on today).
+      getMedicineLogsInRange(pid, today, addDaysIST(today, 1)),
       getDailyChecklist(pid, today),
     ]);
 
@@ -1724,6 +1727,15 @@ export async function getDashboardOverview(patientId?: string): Promise<Dashboar
   };
 
   const activeMeds = medicines.filter((m) => m.active);
+  const activeMedIds = new Set(activeMeds.map((m) => m.id));
+
+  // Keep only the doses that belong to today, by the same rule the Medicines card uses
+  // (the dose's own day, not the row's raw timestamp). Rows of a removed medicine are dropped.
+  const doseMinutes = new Map(medicines.map((m) => [m.id, scheduledMinutes(m.scheduled_time)]));
+  const medLogs = medLogsRaw.filter((l) => {
+    const min = doseMinutes.get(l.medicine_id);
+    return min !== undefined && doseDateOfLog(l, min) === today;
+  });
 
   // Latest log per medicine today (a real log beats the virtual auto-missed one).
   const latestLogByMedId = new Map<string, MedicineLogEntry>();
@@ -1744,7 +1756,9 @@ export async function getDashboardOverview(patientId?: string): Promise<Dashboar
 
   const takenMedIds = new Set<string>();
   latestLogByMedId.forEach((log, medId) => {
-    if (log.status === "taken" || log.status === "late") takenMedIds.add(medId);
+    // Only active medicines count: the total below is the active ones, so a dose of a medicine that
+    // was since switched off must not push "taken" past it (13 of 11).
+    if (activeMedIds.has(medId) && (log.status === "taken" || log.status === "late")) takenMedIds.add(medId);
   });
 
   return {
