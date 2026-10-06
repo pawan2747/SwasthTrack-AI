@@ -46,6 +46,15 @@ export function ensureLateTable(table: string): Promise<void> {
   return pending;
 }
 
+/**
+ * Creates every late table that is still missing. Called once per server start
+ * (src/instrumentation.ts) so a fresh deployment is ready before anyone opens the
+ * feature; the per-query hook above remains as the fallback. Never throws.
+ */
+export async function ensureAllLateTables(): Promise<void> {
+  await Promise.all(Object.keys(LATE_TABLES).map((table) => ensureLateTable(table).catch(() => undefined)));
+}
+
 /** For tests: forget that a table was ensured. */
 export function resetLateTables(): void {
   ensured.clear();

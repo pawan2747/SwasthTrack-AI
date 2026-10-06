@@ -72,9 +72,10 @@ offered first, with the same foods and portions.
 ## Database
 
 New table `food_photo_examples` (`db/mysql/schema.sql`). `npm run db:migrate` creates it, and
-so does the app itself the first time the table is used (`src/lib/db/server/late-tables.ts`,
-an idempotent `CREATE TABLE IF NOT EXISTS`), so a hosted database that predates this feature
-needs no manual step. Access: members read, editors and owners write, `created_by` is forced
+so does the app itself: once at every server start (`src/instrumentation.ts`, not awaited) and
+again before any query that touches the table (`src/lib/db/server/late-tables.ts`), both as an
+idempotent `CREATE TABLE IF NOT EXISTS`. Deploying the new version is therefore the migration;
+a hosted database that predates this feature needs no manual step. Access: members read, editors and owners write, `created_by` is forced
 to the caller, the embedding never changes (`src/lib/db/server/policy.ts`; covered by
 `npm run db:test`).
 
