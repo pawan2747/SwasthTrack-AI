@@ -56,7 +56,7 @@ Other rules (all in `policy.ts`, all covered by `scripts/db/db-test.mjs`):
   person who created it (`created_by` is filled by the server, never taken from the request).
 - SOIE conversations, feedback and events belong to the user who made them; family
   "memories" belong to the patient.
-- The scheduled e-mail jobs run as a **read-only system identity** limited to `REPORT_PATIENT_ID`.
+- The scheduled e-mail jobs run as a **read-only system identity** limited to the one patient they are building a mail for.
 - `auth_users`, `auth_sessions`, `auth_otps`, `auth_attempts` and `caregiver_invite_attempts` are not
   reachable through the gateway at all.
 

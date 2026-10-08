@@ -1,11 +1,6 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { fillRecipient } from "./layout";
 
-export interface ReportConfig {
-  patientId: string;
-  recipients: string[];
-}
-
 export interface SendResult {
   ok: boolean;
   messageId?: string;
@@ -13,18 +8,15 @@ export interface SendResult {
 }
 
 /**
- * Recipients and the patient they belong to come from env for now — the app has
- * no stored e-mail addresses (auth is phone-only). Returns null when unset so
- * callers can refuse to send rather than guess.
+ * Where the "send me the sample e-mails" tool delivers (REPORT_EMAIL_TO, comma-separated).
+ * Real alerts and reports never use this: they go to the patient's own members, see
+ * `getPatientRecipients` in lib/db/server/recipients.ts.
  */
-export function getReportConfig(): ReportConfig | null {
-  const patientId = process.env.REPORT_PATIENT_ID?.trim();
-  const recipients = (process.env.REPORT_EMAIL_TO ?? "")
+export function getSampleRecipients(): string[] {
+  return (process.env.REPORT_EMAIL_TO ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!patientId || recipients.length === 0) return null;
-  return { patientId, recipients };
 }
 
 let transporter: Transporter | null = null;

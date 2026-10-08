@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { getReportConfig, sendMail } from "@/lib/email/mailer";
+import { getSampleRecipients, sendMail } from "@/lib/email/mailer";
 import { EMAIL_TEMPLATES, getEmailTemplate } from "@/lib/email/registry";
 
 export const runtime = "nodejs";
@@ -113,8 +113,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const config = getReportConfig();
-  if (!config) return Response.json({ error: "REPORT_EMAIL_TO / REPORT_PATIENT_ID not set" }, { status: 500 });
+  const recipients = getSampleRecipients();
+  if (recipients.length === 0) return Response.json({ error: "REPORT_EMAIL_TO not set" }, { status: 500 });
 
   let type = "all";
   try {
@@ -130,10 +130,10 @@ export async function POST(request: Request) {
   const results: { key: string; sent: boolean; error?: string }[] = [];
   for (const t of targets) {
     const mail = t.sample();
-    const res = await sendMail(config.recipients, { ...mail, subject: `[Sample] ${mail.subject}` });
+    const res = await sendMail(recipients, { ...mail, subject: `[Sample] ${mail.subject}` });
     results.push({ key: t.key, sent: res.ok, error: res.error });
     // Resend allows ~2 requests per second.
     await new Promise((r) => setTimeout(r, 700));
   }
-  return Response.json({ to: config.recipients, results });
+  return Response.json({ to: recipients, results });
 }

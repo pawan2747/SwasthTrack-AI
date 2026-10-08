@@ -123,7 +123,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "alert.bp.crisis",
     category: "alert",
     label: "BP alert — very high / crisis",
-    trigger: "Right after a BP reading is saved at or above the patient's crisis line. To REPORT_EMAIL_TO.",
+    trigger: "Right after a BP reading is saved at or above the patient's crisis line. To the patient's owner and caregivers.",
     sample: (o) =>
       done(renderBpAlertEmail({ patientName: PATIENT, level: "critical", value: "186/122", pulse: 96, slot: "morning", timeLabel: "7:42 AM", outOfRange7d: 3 }, { ...sample, ...o })),
   },
@@ -131,7 +131,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "alert.bp.high",
     category: "alert",
     label: "BP alert — high",
-    trigger: "Right after a BP reading is saved at or above the patient's alert line. To REPORT_EMAIL_TO.",
+    trigger: "Right after a BP reading is saved at or above the patient's alert line. To the patient's owner and caregivers.",
     sample: (o) =>
       done(renderBpAlertEmail({ patientName: PATIENT, level: "high", value: "152/96", pulse: 84, slot: "evening", timeLabel: "8:10 PM", outOfRange7d: 2 }, { ...sample, ...o })),
   },
@@ -139,7 +139,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "alert.bp.low",
     category: "alert",
     label: "BP alert — low",
-    trigger: "Right after a BP reading is saved below the patient's low line. To REPORT_EMAIL_TO.",
+    trigger: "Right after a BP reading is saved below the patient's low line. To the patient's owner and caregivers.",
     sample: (o) =>
       done(renderBpAlertEmail({ patientName: PATIENT, level: "low", value: "88/56", pulse: 72, slot: "morning", timeLabel: "7:42 AM", outOfRange7d: 1 }, { ...sample, ...o })),
   },
@@ -147,7 +147,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "alert.reminder",
     category: "alert",
     label: "Reminder — missed medicines + records",
-    trigger: "Cron, 2 PM IST. Only sent when something is missing. To REPORT_EMAIL_TO.",
+    trigger: "Cron, 2 PM IST. Only sent when something is missing. To the patient's owner and caregivers.",
     sample: (o) =>
       done(
         renderReminderEmail(
@@ -197,7 +197,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "alert.weight",
     category: "alert",
     label: "Rapid weight change alert",
-    trigger: "Right after a weigh-in that moves ≥ 2 kg in 7 days or ≥ 5% in 30 days. To REPORT_EMAIL_TO.",
+    trigger: "Right after a weigh-in that moves ≥ 2 kg in 7 days or ≥ 5% in 30 days. To the patient's owner and caregivers.",
     sample: (o) =>
       done(
         renderWeightAlertEmail(
@@ -217,7 +217,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "report.daily",
     category: "report",
     label: "Daily report",
-    trigger: "Cron, 9 PM IST every day. To REPORT_EMAIL_TO.",
+    trigger: "Cron, 9 PM IST every day. To the patient's owner and caregivers.",
     sample: (o) =>
       done(
         renderDailyReport(
@@ -263,7 +263,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "report.weekly",
     category: "report",
     label: "Weekly report",
-    trigger: "Cron, Sunday 8 PM IST. To REPORT_EMAIL_TO.",
+    trigger: "Cron, Sunday 8 PM IST. To the patient's owner and caregivers.",
     sample: (o) =>
       done(renderWeeklyReport({ patientName: PATIENT, summary: sampleWeekly, bpAverage: { systolic: 134, diastolic: 86 }, bpAlertCount: 2 }, { ...sample, ...o })),
   },
@@ -271,7 +271,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     key: "report.monthly",
     category: "report",
     label: "Monthly report (last 30 days)",
-    trigger: "Cron, 9 AM IST on the 1st of every month. To REPORT_EMAIL_TO.",
+    trigger: "Cron, 9 AM IST on the 1st of every month. To the patient's owner and caregivers.",
     sample: (o) =>
       done(renderMonthlyReport({ patientName: PATIENT, summary: sampleMonthly, bpAverage: { systolic: 136, diastolic: 87 }, bpAlertCount: 7 }, { ...sample, ...o })),
   },

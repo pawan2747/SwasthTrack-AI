@@ -1,4 +1,5 @@
-import { getReportConfig, sendMail } from "@/lib/email/mailer";
+import { sendMail } from "@/lib/email/mailer";
+import { getPatientRecipients } from "@/lib/db/server/recipients";
 import type { RenderedEmail } from "@/lib/email/types";
 import {
   HttpError,
@@ -40,7 +41,8 @@ async function build(
  * POST { kind?: "bp" | "weight", patientId, readingId } with the user's session cookie
  * (authFetch) — called by the app right after a BP reading or weigh-in is saved.
  * The body only identifies the reading; subject, content and recipients are all
- * decided on the server. Reads run as the signed-in user, so the access rules apply.
+ * decided on the server: the mail goes to the patient's owner and active caregivers (never
+ * to an address from the request). Reads run as the signed-in user, so the access rules apply.
  */
 export async function POST(request: Request) {
   const key = { value: "" };
@@ -64,11 +66,9 @@ export async function POST(request: Request) {
     // Must be a member of this patient; the access rules would also hide the rows from anyone else.
     await requirePatientAccess(db, user.id, patientId);
 
-    const config = getReportConfig();
-    if (!config) return Response.json({ sent: false, reason: "email not configured" });
-    if (patientId !== config.patientId) {
-      return Response.json({ sent: false, reason: "patient not subscribed to e-mail alerts" });
-    }
+    // The patient's own people: the owner's sign-up address and every active caregiver.
+    const recipients = await getPatientRecipients(patientId);
+    if (recipients.length === 0) return Response.json({ sent: false, reason: "nobody on this patient has an e-mail address" });
 
     key.value = `${kind}:${readingId}`;
     if (alreadySent.has(key.value)) {
@@ -83,12 +83,14 @@ export async function POST(request: Request) {
       return Response.json({ sent: false, reason: outcome.reason });
     }
 
-    const result = await sendMail(config.recipients, outcome.email);
-    if (!result.ok) {
+    const result = await sendMail(recipients, outcome.email);
+    if (!result.ok && !result.messageId) {
       alreadySent.delete(key.value);
       console.error(`[email] ${kind} alert send failed:`, result.error);
       return Response.json({ sent: false, error: result.error }, { status: 502 });
     }
+    // Reached at least one person but not all: keep the "already sent" mark so a retry cannot mail the others twice.
+    if (!result.ok) console.error(`[email] ${kind} alert reached only some recipients:`, result.error);
     return Response.json({ sent: true, kind });
   } catch (err) {
     if (key.value) alreadySent.delete(key.value);

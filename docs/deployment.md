@@ -38,7 +38,7 @@ Copy `.env.example` to `.env.local` for local work. Set the same names in
 | `NEXT_PUBLIC_APP_URL` | Optional | Public address of the site, for the logo and links in e-mails |
 | `ANTHROPIC_API_KEY` | Recommended | Powers the LLM answers in Ask (SOIE). Without it the assistant answers from the rule-based engine and says so. Never prefix with `NEXT_PUBLIC_` |
 | `SOIE_MODEL`, `SOIE_WEB_SEARCH`, `SOIE_RATE_LIMIT_PER_HOUR`, `SOIE_EFFORT`, `SOIE_TIMEOUT_MS` | Optional | SOIE tuning, see `.env.example` |
-| `CRON_SECRET`, `REPORT_PATIENT_ID`, `REPORT_EMAIL_TO` | Only if scheduled report e-mails are on | Read by the `/api/cron/*` routes scheduled in `vercel.json`. The reports are built by a read-only system identity that can see only `REPORT_PATIENT_ID` (no login account needed) |
+| `CRON_SECRET` | Only if scheduled report e-mails are on | Read by the `/api/cron/*` routes scheduled in `vercel.json`. Each patient's report is built by a read-only system identity that sees only that patient, and is mailed to the patient's owner and active caregivers (no per-patient setting needed). `REPORT_EMAIL_TO` / `REPORT_PATIENT_ID` are no longer needed for this |
 
 Rules of thumb:
 

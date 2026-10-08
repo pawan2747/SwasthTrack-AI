@@ -3,7 +3,7 @@ import { createDb } from "./executor";
 
 /**
  * Server only. The identity the scheduled e-mail jobs run as: READ-ONLY, and only for
- * the patients it is created for (the REPORT_PATIENT_ID in the environment).
+ * the patients it is created for (the cron job creates one per patient, see lib/email/cron-route.ts).
  *
  * Cron has no signed-in user. Instead of a shared "notifier" login (the old design),
  * the server simply runs the report queries as a scoped system principal: it can read that

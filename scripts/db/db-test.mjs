@@ -43,6 +43,7 @@ console.log(`Test database ${describeTarget(url)} reset and schema applied.\n`);
 const { createDb } = await import(src("lib/db/server/executor.ts"));
 const { getPool, closePool } = await import(src("lib/db/server/pool.ts"));
 const auth = await import(src("lib/auth/service.ts"));
+const { getPatientRecipients, listPatientRecipients } = await import(src("lib/db/server/recipients.ts"));
 
 // ---- tiny runner -------------------------------------------------------------
 let passed = 0;
@@ -474,6 +475,18 @@ await test("the roster and 'owner contacts' are owner / fresh-member only", asyn
   assert.equal((await dbC.rpc("get_patient_owner_contacts", { p_patient: P.id })).error.code, "42501");
 });
 
+await test("alerts and reports go to the owner's sign-up address and every active caregiver, patient by patient", async () => {
+  assert.deepEqual(await getPatientRecipients(P.id), ["a@test.dev", "b@test.dev"], "owner first, then the caregiver");
+  const all = await listPatientRecipients();
+  const mine = all.find((r) => r.patientId === P.id);
+  assert.equal(mine.patientName, "Papa");
+  assert.deepEqual(mine.emails, ["a@test.dev", "b@test.dev"]);
+  const theirs = all.find((r) => r.emails.includes("c@test.dev"));
+  assert.ok(theirs && theirs.patientId !== P.id, "C's own patient is listed separately");
+  assert.deepEqual(theirs.emails, ["c@test.dev"], "another patient's mail never goes to Papa's people (and the reverse)");
+  assert.deepEqual(await getPatientRecipients("33333333-3333-4333-8333-333333333333"), [], "unknown patient: nobody");
+});
+
 await test("the owner changes a role (editor can write) and revokes access (nothing readable afterwards)", async () => {
   const memberId = (await dbA.rpc("list_patient_members", { p_patient: P.id })).data[1].member_id;
   assert.equal((await dbA.rpc("set_patient_member", { p_member: memberId, p_role: "editor" })).error, null);
@@ -485,6 +498,18 @@ await test("the owner changes a role (editor can write) and revokes access (noth
   assert.deepEqual((await dbB.from("bp_logs").select("id").eq("patient_id", P.id)).data, []);
   assert.deepEqual((await dbB.from("patients").select("id")).data, []);
   assert.equal((await dbB.from("weight_logs").insert({ patient_id: P.id, weight_kg: 82 })).error.code, "42501");
+});
+
+await test("a caregiver whose access was removed stops getting the e-mails; an unverified address never gets any", async () => {
+  assert.deepEqual(await getPatientRecipients(P.id), ["a@test.dev"], "B was revoked in the test above");
+  assert.deepEqual((await listPatientRecipients()).find((r) => r.patientId === P.id).emails, ["a@test.dev"]);
+  await getPool().query("UPDATE auth_users SET email_verified_at = NULL WHERE id = ?", [A.user.id]);
+  try {
+    assert.deepEqual(await getPatientRecipients(P.id), [], "no verified address left");
+    assert.equal((await listPatientRecipients()).find((r) => r.patientId === P.id), undefined, "a patient nobody can be mailed for is not listed");
+  } finally {
+    await getPool().query("UPDATE auth_users SET email_verified_at = NOW(3) WHERE id = ?", [A.user.id]);
+  }
 });
 
 await test("an expired code is refused and marked expired; a user cannot brute-force codes (10 tries / 15 min)", async () => {
