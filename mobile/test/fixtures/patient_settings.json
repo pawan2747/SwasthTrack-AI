@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "daily_calorie_target": 1600,
+      "daily_step_goal": 6000,
+      "sleep_target_hours": 7,
+      "bp_monitoring_schedule": "morning_evening",
+      "weight_unit": "kg",
+      "height_unit": "cm",
+      "distance_unit": "km",
+      "timezone": "Asia/Kolkata",
+      "preferred_language": "bilingual",
+      "alerts_enabled": {
+        "bp": true,
+        "sleep": true,
+        "activity": true,
+        "medicine": true,
+        "missingData": true
+      },
+      "bp_targets": {
+        "low_systolic": 90,
+        "low_diastolic": 60,
+        "alert_systolic": 160,
+        "alert_diastolic": 100,
+        "crisis_systolic": 180,
+        "target_systolic": 130,
+        "crisis_diastolic": 120,
+        "target_diastolic": 80
+      },
+      "updated_at": "2026-10-14T18:10:08.703Z"
+    }
+  ],
+  "error": null,
+  "count": null
+}

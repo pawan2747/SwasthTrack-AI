@@ -1,0 +1,70 @@
+{
+  "data": [
+    {
+      "role": "owner",
+      "created_at": "2026-10-14T18:10:08.702Z",
+      "patients": {
+        "id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+        "name": "Ramesh Sharma",
+        "age": 68,
+        "gender": "Male",
+        "height_cm": 168,
+        "current_weight_kg": 78,
+        "target_weight_kg": 74,
+        "daily_calorie_target": 1600,
+        "created_at": "2026-10-14T18:10:08.689Z",
+        "updated_at": "2026-10-14T18:10:08.689Z"
+      }
+    },
+    {
+      "role": "owner",
+      "created_at": "2026-10-14T18:10:08.721Z",
+      "patients": {
+        "id": "63fcba27-9f9e-461a-a508-741a2dee7caa",
+        "name": "Sunita Devi",
+        "age": 61,
+        "gender": "Female",
+        "height_cm": 155,
+        "current_weight_kg": 66,
+        "target_weight_kg": 62,
+        "daily_calorie_target": 1600,
+        "created_at": "2026-10-14T18:10:08.721Z",
+        "updated_at": "2026-10-14T18:10:08.721Z"
+      }
+    },
+    {
+      "role": "owner",
+      "created_at": "2026-10-14T18:10:08.728Z",
+      "patients": {
+        "id": "c79297c2-f664-4515-b432-094a5b263b73",
+        "name": "Mohan Lal",
+        "age": 74,
+        "gender": "Male",
+        "height_cm": 170,
+        "current_weight_kg": 71,
+        "target_weight_kg": 67,
+        "daily_calorie_target": 1600,
+        "created_at": "2026-10-14T18:10:08.728Z",
+        "updated_at": "2026-10-14T18:10:08.728Z"
+      }
+    },
+    {
+      "role": "owner",
+      "created_at": "2026-10-14T18:10:08.731Z",
+      "patients": {
+        "id": "aabe2f4d-d1c0-4a29-8c03-427c930deba4",
+        "name": "Kamla Verma",
+        "age": 70,
+        "gender": "Female",
+        "height_cm": 158,
+        "current_weight_kg": 62,
+        "target_weight_kg": 58,
+        "daily_calorie_target": 1600,
+        "created_at": "2026-10-14T18:10:08.731Z",
+        "updated_at": "2026-10-14T18:10:08.731Z"
+      }
+    }
+  ],
+  "error": null,
+  "count": null
+}

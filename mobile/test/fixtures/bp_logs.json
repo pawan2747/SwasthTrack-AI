@@ -1,0 +1,50 @@
+{
+  "data": [
+    {
+      "id": "c3339f7c-a933-4aad-a954-15e19a74e831",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "systolic": 192,
+      "diastolic": 118,
+      "pulse": 96,
+      "reading_type": "morning",
+      "measured_at": "2026-10-14T03:40:00.000Z",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.714Z"
+    },
+    {
+      "id": "fb681aae-8d3d-49c9-8ec6-1f90a1f35248",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "systolic": 139,
+      "diastolic": 86,
+      "pulse": 74,
+      "reading_type": "morning",
+      "measured_at": "2026-10-13T03:00:00.000Z",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.714Z"
+    },
+    {
+      "id": "f9df77cf-ca94-4e70-96e7-eb18ab145dd5",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "systolic": 140,
+      "diastolic": 86,
+      "pulse": 74,
+      "reading_type": "morning",
+      "measured_at": "2026-10-12T03:00:00.000Z",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.713Z"
+    },
+    {
+      "id": "0df9750d-29ab-4c02-9162-b0f28849a1b5",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "systolic": 141,
+      "diastolic": 86,
+      "pulse": 74,
+      "reading_type": "morning",
+      "measured_at": "2026-10-11T03:00:00.000Z",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.713Z"
+    }
+  ],
+  "error": null,
+  "count": null
+}
