@@ -1,0 +1,13 @@
+{
+  "configured": true,
+  "user": {
+    "id": "d0f2b806-296b-4770-b67f-756b281e7407",
+    "email": "family@demo.test"
+  },
+  "profile": {
+    "id": "d0f2b806-296b-4770-b67f-756b281e7407",
+    "email": "family@demo.test",
+    "display_name": "Demo Family",
+    "role": "member"
+  }
+}

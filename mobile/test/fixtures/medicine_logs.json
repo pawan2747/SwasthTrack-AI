@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "id": "4ecee4fb-73ae-49b7-b4a7-e8152954ffc4",
+      "medicine_id": "4f34c34d-fafe-4988-86ca-22c43154c74c",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "scheduled_time": "2026-10-14T03:30:00.000Z",
+      "taken_time": null,
+      "status": "missed",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.716Z"
+    },
+    {
+      "id": "22bb09bd-72da-46af-9b64-425c6f0da1f3",
+      "medicine_id": "1e16d4fc-9447-4be4-aac0-9f9c3a06571c",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "scheduled_time": "2026-10-14T02:30:00.000Z",
+      "taken_time": "2026-10-14T02:30:00.000Z",
+      "status": "taken",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.715Z"
+    }
+  ],
+  "error": null,
+  "count": null
+}

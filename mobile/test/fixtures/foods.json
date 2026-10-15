@@ -1,0 +1,94 @@
+{
+  "items": [
+    {
+      "id": "2befcdcd-f633-53dd-8cb1-e07ab7fda0ed",
+      "name": "Roti (Chapati)",
+      "nameHi": "रोटी (चपाती)",
+      "category": "roti",
+      "emoji": "🫓",
+      "diet": "veg",
+      "amountUnit": "g",
+      "caloriesPer100": 265,
+      "proteinPer100": 8.5,
+      "carbsPer100": 47,
+      "fatPer100": 3.5,
+      "fibrePer100": 7.5,
+      "sodiumMgPer100": 60,
+      "referenceWeightG": 35,
+      "portions": [
+        {
+          "name": "1 medium roti (35 g)",
+          "nameHi": "1 रोटी",
+          "grams": 35
+        },
+        {
+          "name": "1 small roti (25 g)",
+          "nameHi": "1 छोटी रोटी",
+          "grams": 25
+        },
+        {
+          "name": "1 thick roti (60 g)",
+          "nameHi": "1 मोटी रोटी",
+          "grams": 60
+        }
+      ]
+    },
+    {
+      "id": "7010724d-7414-5663-94e1-68400aeb4e78",
+      "name": "Roti with Ghee",
+      "nameHi": "घी वाली रोटी",
+      "category": "roti",
+      "emoji": "🫓",
+      "diet": "veg",
+      "amountUnit": "g",
+      "caloriesPer100": 310,
+      "proteinPer100": 7.8,
+      "carbsPer100": 43,
+      "fatPer100": 10.4,
+      "fibrePer100": 6.9,
+      "sodiumMgPer100": 55,
+      "referenceWeightG": 38,
+      "portions": [
+        {
+          "name": "1 roti with ghee (38 g)",
+          "nameHi": "1 घी की रोटी",
+          "grams": 38
+        },
+        {
+          "name": "1 thick roti with ghee (65 g)",
+          "nameHi": "1 मोटी घी रोटी",
+          "grams": 65
+        }
+      ]
+    },
+    {
+      "id": "601eefce-0eb0-5894-bbc5-ce68646ca8ce",
+      "name": "Bajra Roti (Pearl Millet)",
+      "nameHi": "बाजरे की रोटी",
+      "category": "roti",
+      "emoji": "🫓",
+      "diet": "veg",
+      "amountUnit": "g",
+      "caloriesPer100": 255,
+      "proteinPer100": 8,
+      "carbsPer100": 42,
+      "fatPer100": 4.5,
+      "fibrePer100": 7,
+      "sodiumMgPer100": 40,
+      "referenceWeightG": 50,
+      "portions": [
+        {
+          "name": "1 bajra roti (50 g)",
+          "nameHi": "1 बाजरे की रोटी",
+          "grams": 50
+        },
+        {
+          "name": "1 small roti (35 g)",
+          "nameHi": "1 छोटी बाजरा रोटी",
+          "grams": 35
+        }
+      ]
+    }
+  ],
+  "correctedQuery": null
+}

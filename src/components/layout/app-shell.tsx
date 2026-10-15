@@ -29,7 +29,9 @@ function SkipLink() {
 function AppShellContent({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const isStandalonePage = pathname === "/login" || pathname === "/onboarding";
+  // The admin panel brings its own frame (side rail, monitor wall): no patient sidebar or bottom bar around it.
+  const isAdminArea = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isStandalonePage = pathname === "/login" || pathname === "/onboarding" || isAdminArea;
   // About / Privacy / Terms / Disclaimer / Contact are readable without an
   // account. A signed-out visitor has no patient, so the patient-aware shell
   // (sidebar, bottom nav, patient name) is replaced by a slim public frame.

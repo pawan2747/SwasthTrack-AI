@@ -1,0 +1,30 @@
+{
+  "data": [
+    {
+      "id": "48acd2fd-ad56-45d8-8865-73aac2148d2e",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "weight_kg": 78.4,
+      "measured_at": "2026-10-14T02:00:00.000Z",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.715Z"
+    },
+    {
+      "id": "44964826-daec-47ca-a707-8674aed1a36b",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "weight_kg": 77.95,
+      "measured_at": "2026-10-13T02:00:00.000Z",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.714Z"
+    },
+    {
+      "id": "1d34de18-148c-4ed0-b2d6-5e1e525edfd6",
+      "patient_id": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+      "weight_kg": 77.9,
+      "measured_at": "2026-10-12T02:00:00.000Z",
+      "notes": null,
+      "created_at": "2026-10-14T18:10:08.714Z"
+    }
+  ],
+  "error": null,
+  "count": null
+}

@@ -41,6 +41,7 @@ as it did before AI existed. See [AI features](#ai-features-optional) below.
 | `/onboarding` | First-run setup: creates the patient and makes you its owner |
 | `/login` | Email + password sign-in, signup with email code, password reset, optional email-code sign-in |
 | `/simulation-lab` | AI service status (keys by count, models, cooling, usage, "check now") and acceptance-test tools (admin accounts only) |
+| `/admin` | Admin panel (admin accounts only): overview, live alert monitor / wall display, patients, users, system check. See [`docs/admin-panel.md`](docs/admin-panel.md) |
 | `/about`, `/contact`, `/privacy`, `/terms`, `/medical-disclaimer` | Information and policy pages |
 
 ## Stack
@@ -126,6 +127,10 @@ src/app/                 App Router pages (one folder per route) and API routes
   api/soie/              SOIE endpoint (session-cookie authenticated)
   api/ai/                AI settings (per-patient switches), status/diagnostics, daily notes
   api/vision/            photo reading (BP / weight display, meal photo)
+  api/alerts/            a patient's open alerts as JSON (used by the mobile app)
+  api/foods/             food catalogue search with portions (used by the mobile app)
+  api/admin/             admin-only: monitor, patient detail, users, system check
+  admin/                 the admin panel pages
   manifest.ts            PWA manifest
 src/components/
   ask/ caregiver/ dashboard/ food/ forms/ health/ medicines/ reports/ timeline/
@@ -139,6 +144,9 @@ src/lib/                 health-rules.ts (clinical rules + IST dates), active-pa
 src/lib/db/              builder.ts (query builder), client.ts (browser), auth-fetch.ts,
                          database.types.ts, server/ (executor, policy = access rules, schema, rpc, pool)
 src/lib/auth/            accounts, e-mail codes, sessions (server) + client-session.ts (browser)
+src/lib/alerts/          one patient's alerts as JSON (shared by the admin monitor and the mobile app)
+src/lib/admin/           admin guard, monitor snapshot, users, system check (server only)
+mobile/                  the Flutter app (Android + iOS): see mobile/README.md
 src/services/            data layer and analytics (patient-service, settings-service,
                          reports, insights, wellness score, ...)
 src/services/soie/       SOIE types, normalisation and evaluation

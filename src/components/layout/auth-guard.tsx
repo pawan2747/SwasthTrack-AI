@@ -141,6 +141,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const isStaticPublic = matchesRoute(pathname, STATIC_PUBLIC_ROUTES);
   const isLogin = pathname === "/login";
   const isOnboarding = pathname === "/onboarding";
+  // An administrator may have no patient of their own; the admin pages check the role themselves.
+  const isAdminArea = pathname === "/admin" || pathname.startsWith("/admin/");
 
   let decision: Decision;
   if (!databaseConfigured) {
@@ -158,7 +160,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     decision = { kind: "failed", message: loadError };
   } else if (isLogin) {
     decision = { kind: "redirect", to: authorizedPatients.length === 0 ? "onboarding" : "home" };
-  } else if (authorizedPatients.length === 0 && !isOnboarding && !isPublic) {
+  } else if (authorizedPatients.length === 0 && !isOnboarding && !isPublic && !isAdminArea) {
     decision = { kind: "redirect", to: "onboarding" };
   } else {
     decision = { kind: "render" };

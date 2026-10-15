@@ -1,0 +1,92 @@
+{
+  "patientId": "437dc15e-ad3a-4e7c-bc06-f4c0a2e4925f",
+  "generatedAt": "2026-10-14T18:17:38.310Z",
+  "date": "2026-10-14",
+  "level": "critical",
+  "alerts": [
+    {
+      "key": "alert-anom-bp-crisis-c3339f7c-a933-4aad-a954-15e19a74e831",
+      "category": "bp",
+      "level": "critical",
+      "title": "Very high blood pressure reading",
+      "titleHi": "बहुत ज़्यादा ब्लड प्रेशर माप",
+      "message": "192/118 mmHg is in the hypertensive-crisis range (at or above 180/120). Rest for 5 minutes and measure again. If it stays this high, or there is headache, chest pain, weakness, or trouble speaking or seeing, get medical help right away.",
+      "messageHi": "192/118 mmHg क्राइसिस रेंज में है (180/120 या उससे ऊपर)। 5 मिनट आराम करके दोबारा नापें। अगर इतना ही रहे, या सिरदर्द, सीने में दर्द, कमज़ोरी, बोलने या देखने में दिक्कत हो तो तुरंत डॉक्टर/अस्पताल से संपर्क करें।"
+    },
+    {
+      "key": "alert-anom-med-missed-2026-10-14",
+      "category": "medicine",
+      "level": "critical",
+      "title": "Several missed doses recently",
+      "titleHi": "हाल में कई दवाइयाँ छूटीं",
+      "message": "7 doses were missed in the last 3 days (Amlodipine, Metformin, Telmisartan).",
+      "messageHi": "पिछले 3 दिनों में 7 खुराकें छूटीं (Amlodipine, Metformin, Telmisartan)।"
+    },
+    {
+      "key": "alert-anom-bp-target-week-2026-10-14",
+      "category": "bp",
+      "level": "attention",
+      "title": "Blood pressure above target on several readings",
+      "titleHi": "कई माप लक्ष्य से ऊपर",
+      "message": "7 of 7 readings in the last 7 days were at or above this patient's target of 130/80.",
+      "messageHi": "पिछले 7 दिनों के 7 मापों में से 7 माप लक्ष्य 130/80 पर या उससे ऊपर रहे।"
+    },
+    {
+      "key": "alert-med-overdue-2026-10-14",
+      "category": "medicine",
+      "level": "attention",
+      "title": "Medicine not logged",
+      "titleHi": "दवाई दर्ज नहीं हुई",
+      "message": "1 dose(s) are past their time and not logged: Telmisartan.",
+      "messageHi": "1 दवाई का समय निकल चुका है और दर्ज नहीं हुई: Telmisartan।"
+    },
+    {
+      "key": "alert-missing-2026-10-14",
+      "category": "missing_data",
+      "level": "info",
+      "title": "Some of today's entries are missing",
+      "titleHi": "आज की कुछ एंट्री बाकी हैं",
+      "message": "3 items are still not logged today.",
+      "messageHi": "आज 3 मदें अभी भी दर्ज नहीं हुई हैं।"
+    }
+  ],
+  "day": {
+    "tone": "neutral",
+    "text": "Several items that are due have not been logged.",
+    "textHi": "3 मुख्य प्रविष्टियाँ दर्ज होना बाकी हैं।",
+    "completed": [
+      "1 of 3 due doses taken",
+      "1 food item(s) logged",
+      "1 BP reading(s) recorded",
+      "2,100 steps logged",
+      "5 hrs sleep logged",
+      "78.4 kg weight logged"
+    ],
+    "completedHi": [
+      "3 में से 1 दवाइयाँ ली गईं",
+      "1 व्यंजन दर्ज",
+      "1 BP माप दर्ज",
+      "2,100 कदम दर्ज",
+      "5 घंटे नींद दर्ज",
+      "78.4 kg वज़न दर्ज"
+    ],
+    "missing": [
+      "2 due dose(s) not logged",
+      "A main meal that is due is not logged",
+      "Evening BP missing"
+    ],
+    "missingHi": [
+      "2 दवाई दर्ज होना बाकी",
+      "नाश्ता, रात का भोजन दर्ज नहीं है",
+      "शाम का BP दर्ज नहीं है"
+    ]
+  },
+  "doses": {
+    "due": 3,
+    "taken": 1,
+    "late": 0,
+    "missed": 1,
+    "pending": 1,
+    "pct": 50
+  }
+}

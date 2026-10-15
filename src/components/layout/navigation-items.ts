@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquareText,
+  MonitorDot,
   Pill,
   Settings,
   ShieldCheck,
@@ -50,6 +51,7 @@ export const secondaryNavigation: NavigationItem[] = [
 
 /** Developer / QA surface. Only shown to admin accounts. */
 export const developerNavigation: NavigationItem[] = [
+  { href: "/admin", label: "Admin panel", hindiLabel: "एडमिन पैनल", icon: MonitorDot },
   { href: "/simulation-lab", label: "AI & Simulation Lab", hindiLabel: "AI और सिमुलेशन लैब", icon: FlaskConical },
 ];
 
