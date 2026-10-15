@@ -518,3 +518,60 @@ CREATE TABLE IF NOT EXISTS food_photo_examples (
   CONSTRAINT fk_fpe_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE CASCADE,
   CONSTRAINT fk_fpe_creator FOREIGN KEY (created_by) REFERENCES auth_users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- AI layer (src/lib/ai): cached model answers and per-request counters.
+-- Server-only: never exposed through the /api/db gateway. Created on first use too
+-- (src/lib/db/server/late-tables.ts: keep the two in step).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ai_cache (
+  cache_key   CHAR(64) CHARACTER SET ascii NOT NULL,
+  kind        VARCHAR(40) NOT NULL,
+  patient_id  CHAR(36) CHARACTER SET ascii NULL,
+  payload     JSON NOT NULL,
+  provider    VARCHAR(20) NULL,
+  model       VARCHAR(80) NULL,
+  created_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  expires_at  DATETIME(3) NOT NULL,
+  PRIMARY KEY (cache_key),
+  KEY idx_ai_cache_patient (patient_id, kind, created_at),
+  KEY idx_ai_cache_expires (expires_at),
+  CONSTRAINT fk_ai_cache_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ai_events is the budget LEDGER: the per-user hourly, per-patient daily and whole-deployment daily caps are counts over it.
+-- Both keys are ON DELETE SET NULL (never CASCADE): deleting a patient or an account must not erase the counts, or a user
+-- could reset every cap by deleting and re-creating a patient. A database created from an older copy of this file holds
+-- CASCADE keys: late-tables.ts and `npm run db:migrate` switch them (see docs/ai.md, "Budget ledger").
+CREATE TABLE IF NOT EXISTS ai_events (
+  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id        CHAR(36) CHARACTER SET ascii NULL,
+  patient_id     CHAR(36) CHARACTER SET ascii NULL,
+  task           VARCHAR(40) NOT NULL,
+  status         VARCHAR(24) NOT NULL,
+  provider       VARCHAR(20) NULL,
+  model          VARCHAR(80) NULL,
+  latency_ms     INT NULL,
+  input_tokens   INT NULL,
+  output_tokens  INT NULL,
+  created_at     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY idx_ai_events_user (user_id, created_at),
+  KEY idx_ai_events_patient (patient_id, created_at),
+  KEY idx_ai_events_created (created_at),
+  CONSTRAINT fk_ai_events_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE SET NULL,
+  CONSTRAINT fk_ai_events_user FOREIGN KEY (user_id) REFERENCES auth_users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Per-patient AI consent: photos (NULL = never asked, 0 = off, 1 = on) and text features (NULL = never asked: nothing is sent until the family says yes).
+-- Server-only, read and written through /api/ai/settings (also created on first use, see late-tables.ts).
+CREATE TABLE IF NOT EXISTS patient_ai_settings (
+  patient_id  CHAR(36) CHARACTER SET ascii NOT NULL,
+  photos      TINYINT NULL,
+  text_ai     TINYINT NULL,
+  updated_by  CHAR(36) CHARACTER SET ascii NULL,
+  updated_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (patient_id),
+  CONSTRAINT fk_pai_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE CASCADE,
+  CONSTRAINT fk_pai_user FOREIGN KEY (updated_by) REFERENCES auth_users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

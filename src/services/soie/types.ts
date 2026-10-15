@@ -322,7 +322,13 @@ export interface Notice {
     | "truncated_data"
     | "ai_refused"
     | "web_search_off"
-    | "sparse_data";
+    | "sparse_data"
+    /** The family has not been asked yet whether questions and de-identified figures may go to an AI service. */
+    | "ai_consent_unasked"
+    /** The family said no (or an owner switched it off in settings). */
+    | "ai_consent_off"
+    /** The day's AI allowance (this family's, or the whole service's) is used up. */
+    | "ai_quota";
   tone: "info" | "attention";
   hi: string;
   en: string;

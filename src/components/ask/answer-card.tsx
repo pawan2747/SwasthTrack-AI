@@ -11,12 +11,17 @@ import {
   Globe,
   ListChecks,
   Phone,
+  RotateCcw,
   Share2,
   ShieldCheck,
+  Sparkles,
   Stethoscope,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
+import { AiConsentDialog } from "@/components/ai/ai-consent-dialog";
+import { SettingsAiLink } from "@/components/ask/ai-status";
+import { EMERGENCY_NOW, engineBadge, noticeAction } from "@/components/ask/ask-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,8 +29,9 @@ import { Modal } from "@/components/ui/modal";
 import { Segmented } from "@/components/ui/segmented";
 import { TextArea } from "@/components/ui/form-field";
 import { useToast } from "@/components/ui/toast";
+import { useAiSettings } from "@/hooks/use-ai-settings";
 import { cn } from "@/lib/utils";
-import type { EvidenceItem, Recommendation, RecommendationKind, SoieAnswer } from "@/services/soie/types";
+import type { EvidenceItem, Notice, Recommendation, RecommendationKind, SoieAnswer } from "@/services/soie/types";
 
 const KIND_ORDER: RecommendationKind[] = ["urgent", "ask_doctor", "monitoring", "diet", "lifestyle"];
 const KIND_LABEL: Record<RecommendationKind, { hi: string; en: string }> = {
@@ -169,19 +175,19 @@ export function EmergencyCard({ answer }: { answer: SoieAnswer }) {
         </span>
         <div className="min-w-0">
           <p lang="hi" className="text-xl font-bold leading-tight text-critical">
-            तुरंत 112 / 108 पर कॉल करें
+            {EMERGENCY_NOW.hi}
           </p>
-          <p className="text-sm text-ink-muted">Call 112 / 108 now. Do not wait for this app.</p>
+          <p className="text-sm text-ink-muted">{EMERGENCY_NOW.en}</p>
         </div>
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <a href="tel:112" className="pressable flex min-h-14 items-center justify-center gap-2 rounded-control bg-critical px-4 text-lg font-bold text-ink-inverse shadow-e2">
           <Phone aria-hidden className="h-5 w-5" />
-          112 कॉल करें
+          {EMERGENCY_NOW.call112}
         </a>
         <a href="tel:108" className="pressable flex min-h-14 items-center justify-center gap-2 rounded-control border-2 border-critical bg-surface px-4 text-lg font-bold text-critical">
           <Phone aria-hidden className="h-5 w-5" />
-          108 एम्बुलेंस
+          {EMERGENCY_NOW.call108}
         </a>
       </div>
       <div className="mt-4">
@@ -212,6 +218,73 @@ export interface AnswerCardProps {
   canRate: boolean;
   onFeedback: (rating: "helpful" | "not_helpful", comment: string | null) => void;
   onAsk: (q: string) => void;
+  /** The patient this answer is about: lets a "AI is off / not asked yet" notice offer the right next step. */
+  patientId?: string | null;
+  /** The question this answer replies to, for "फिर से पूछें" after AI was switched on. */
+  question?: string | null;
+  /** Re-asks `question` (once: the offer disappears while it is being asked). */
+  onReask?: (question: string) => void;
+}
+
+/**
+ * What a "AI is not on for this family" notice may offer, decided by noticeAction (ask-ui.ts):
+ *   not asked yet + can decide   a button that opens the consent dialog, on a TAP (never on load)
+ *   family said no               a link to Settings > AI, never a button that quietly turns it back on
+ *   AI is on now                 "फिर से पूछें" for the same question
+ * Only the newest answer carries it; older cards show their notice and nothing else.
+ */
+function ConsentNoticeActions({
+  code,
+  patientId,
+  question,
+  featured,
+  onReask,
+}: {
+  code: Notice["code"];
+  patientId: string;
+  question: string | null;
+  featured: boolean;
+  onReask?: (question: string) => void;
+}) {
+  const ai = useAiSettings(patientId);
+  const [open, setOpen] = useState(false);
+  const action = noticeAction(code, {
+    known: ai.settings !== null,
+    available: ai.available,
+    textOn: ai.textOn,
+    canChange: ai.canChange,
+    featured,
+    hasQuestion: Boolean(question && onReask),
+  });
+  if (action.kind === "none") return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+      {action.kind === "enable" ? (
+        <Button size="sm" variant="primary" onClick={() => setOpen(true)}>
+          <Sparkles aria-hidden className="h-3.5 w-3.5" />
+          <span lang="hi">AI चालू करें</span>
+        </Button>
+      ) : null}
+      {action.kind === "reask" && question && onReask ? (
+        <>
+          <span lang="hi" className="font-medium">
+            AI अब चालू है।
+          </span>
+          <Button size="sm" variant="primary" onClick={() => onReask(question)}>
+            <RotateCcw aria-hidden className="h-3.5 w-3.5" />
+            <span lang="hi">फिर से पूछें</span>
+          </Button>
+        </>
+      ) : null}
+      {action.kind === "settings_link" ? <SettingsAiLink /> : null}
+      {action.kind === "ask_owner" ? (
+        <span lang="hi" className="font-medium">
+          AI चालू करना परिवार के मालिक या एडिटर के हाथ में है।
+        </span>
+      ) : null}
+      <AiConsentDialog isOpen={open} onClose={() => setOpen(false)} patientId={patientId} need="text" />
+    </div>
+  );
 }
 
 function SectionLabel({ children, icon: Icon }: { children: ReactNode; icon?: typeof BookOpen }) {
@@ -223,7 +296,7 @@ function SectionLabel({ children, icon: Icon }: { children: ReactNode; icon?: ty
   );
 }
 
-export function AnswerCard({ answer, featured = false, feedback, canRate, onFeedback, onAsk }: AnswerCardProps) {
+export function AnswerCard({ answer, featured = false, feedback, canRate, onFeedback, onAsk, patientId = null, question = null, onReask }: AnswerCardProps) {
   const [lang, setLang] = useState<"hi" | "en">("hi");
   const [open, setOpen] = useState<EvidenceItem | null>(null);
   const [commenting, setCommenting] = useState(false);
@@ -235,12 +308,13 @@ export function AnswerCard({ answer, featured = false, feedback, canRate, onFeed
 
   if (answer.engine === "safety") return <EmergencyCard answer={answer} />;
 
-  const engineBadge =
-    answer.engine === "ai"
-      ? answer.webSearchUsed
-        ? { label: "AI + इंटरनेट", variant: "gold" as const, icon: Globe }
-        : { label: "AI", variant: "brand" as const, icon: Bot }
-      : { label: "नियम-आधारित", variant: "neutral" as const, icon: ShieldCheck };
+  const engine = engineBadge(answer);
+  const engineLook =
+    engine.kind === "ai_web"
+      ? { variant: "gold" as const, icon: Globe }
+      : engine.kind === "ai"
+        ? { variant: "brand" as const, icon: Bot }
+        : { variant: "neutral" as const, icon: ShieldCheck };
   const text = lang === "hi" ? answer.answer_hi : answer.answer_en;
   const conf = CONF_LABEL[answer.confidence];
   // Rule-engine answers often open with the headline verbatim; showing both reads as a stutter.
@@ -268,13 +342,13 @@ export function AnswerCard({ answer, featured = false, feedback, canRate, onFeed
     await copy();
   }
 
-  const EngineIcon = engineBadge.icon;
+  const EngineIcon = engineLook.icon;
   return (
     <Card tone={featured ? "premium" : "default"} className="space-y-4" aria-live="polite">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-        <Badge variant={engineBadge.variant}>
+        <Badge variant={engineLook.variant} title={engine.title}>
           <EngineIcon aria-hidden className="h-3 w-3" />
-          <span lang="hi">{engineBadge.label}</span>
+          <span lang="hi">{engine.label}</span>
         </Badge>
         <Badge variant={conf.variant}>
           <span lang="hi">{conf.hi}</span>
@@ -302,6 +376,9 @@ export function AnswerCard({ answer, featured = false, feedback, canRate, onFeed
       {answer.notices.map((n) => (
         <div key={n.code} className={cn("rounded-field border px-3 py-2 text-xs leading-relaxed", n.tone === "attention" ? "border-attention-line bg-attention-soft text-attention" : "border-info-line bg-info-soft text-info")}>
           <p lang={lang}>{lang === "hi" ? n.hi : n.en}</p>
+          {patientId && (n.code === "ai_consent_unasked" || n.code === "ai_consent_off") ? (
+            <ConsentNoticeActions code={n.code} patientId={patientId} question={question} featured={featured} onReask={onReask} />
+          ) : null}
         </div>
       ))}
 
@@ -470,7 +547,7 @@ export function AnswerCard({ answer, featured = false, feedback, canRate, onFeed
           अपनी बात लिखें (वैकल्पिक)
         </label>
         <TextArea id="soie-fb" value={comment} maxLength={500} onChange={(e) => setComment(e.target.value)} placeholder="जैसे: जवाब बहुत लंबा था / दवा वाला हिस्सा साफ़ नहीं था" />
-        <p className="mt-2 text-xs text-ink-subtle">आपके फीडबैक और सेव की गई बातें अगले जवाबों में इस्तेमाल होती हैं।</p>
+        <p className="mt-2 text-xs text-ink-subtle">AI चालू होने पर आपके फीडबैक और सेव की गई बातें अगले जवाबों में काम आती हैं।</p>
       </Modal>
     </Card>
   );

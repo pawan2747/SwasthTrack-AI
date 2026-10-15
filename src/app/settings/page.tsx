@@ -14,6 +14,7 @@ import {
   Moon,
   RotateCcw,
   Save,
+  Sparkles,
   Target,
   User,
   Users,
@@ -36,11 +37,12 @@ import { getPatientProfile, updatePatientProfile, type PatientProfile } from "@/
 import { resetQuickFoodPreferences } from "@/services/quick-food-service";
 import { getPatientSettings, updatePatientSettings, type BPScheduleType, type PatientSettings } from "@/services/settings-service";
 import { AccountPanel } from "./_components/account-panel";
+import { AiPanel } from "./_components/ai-panel";
 import { DataPanel } from "./_components/data-panel";
 import { FamilyPanel } from "./_components/family-panel";
 import { PresetChips, SettingsCard, ToggleRow } from "./_components/settings-ui";
 
-type Tab = "account" | "goals" | "bp" | "alerts" | "family" | "data";
+type Tab = "account" | "goals" | "bp" | "alerts" | "family" | "ai" | "data";
 
 const TABS: SegmentedOption<Tab>[] = [
   { value: "account", label: "Account", hindiLabel: "खाता", icon: User },
@@ -48,6 +50,8 @@ const TABS: SegmentedOption<Tab>[] = [
   { value: "bp", label: "BP", hindiLabel: "रक्तचाप", icon: HeartPulse },
   { value: "alerts", label: "Alerts", hindiLabel: "अलर्ट", icon: Bell },
   { value: "family", label: "Family", hindiLabel: "परिवार", icon: Users },
+  // Not in FORM_TABS: its switches save at once (the server is the authority), there is no save bar.
+  { value: "ai", label: "AI", hindiLabel: "AI सहायता", icon: Sparkles },
   { value: "data", label: "Data", hindiLabel: "डेटा", icon: Download },
 ];
 
@@ -189,7 +193,11 @@ function SettingsView() {
   const toast = useToast();
   const tabsId = useId();
 
-  const [tab, setTab] = useState<Tab>("account");
+  // Links such as /settings?tab=ai (from Ask) open that tab. This view mounts only after sign-in has loaded in the
+  // browser (the page shows a skeleton until then), so reading the address here cannot mismatch the server render.
+  const [tab, setTab] = useState<Tab>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "ai" ? "ai" : "account",
+  );
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [settings, setSettings] = useState<PatientSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -424,7 +432,8 @@ function SettingsView() {
       <div role="tabpanel" id={segmentedPanelId(tabsId, tab)} aria-labelledby={segmentedTabId(tabsId, tab)} className="space-y-4">
         {tab === "account" ? <AccountPanel patient={patient} onJoin={() => setIsJoinOpen(true)} /> : null}
         {tab === "family" ? <FamilyPanel patient={patient} /> : null}
-        {tab === "data" ? <DataPanel patient={patient} canWrite={canWrite} /> : null}
+        {tab === "ai" ? <AiPanel patientId={patient.id} /> : null}
+        {tab === "data" ? <DataPanel patient={patient} canWrite={canWrite} onOpenAi={() => setTab("ai")} /> : null}
 
         {FORM_TABS.includes(tab) ? (
           <form onSubmit={handleSave} noValidate aria-label="सेटिंग्स" className="space-y-4">

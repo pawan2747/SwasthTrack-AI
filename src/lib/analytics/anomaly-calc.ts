@@ -14,6 +14,9 @@ import {
   BASELINE_MIN_BP_READINGS,
   CALORIE_OVER_MARGIN_KCAL,
   LOGGING_GAP_DAYS,
+  MISSED_DOSE_CLUSTER_DAYS,
+  PATTERN_MAX_ALERTS,
+  PATTERN_WINDOW_DAYS,
   PULSE_EXTREME_HIGH,
   PULSE_EXTREME_LOW,
   SLEEP_LOW_AVG_HOURS,
@@ -36,8 +39,19 @@ import {
   type AlertToggles,
   type BPThresholds,
 } from "../health-rules";
+import { classifyMedicine, isCriticalClass } from "../medicine-classes";
 import { missedDoseCluster, summarizeAdherence, type DoseRecord } from "./adherence";
 import { ageInDays } from "./dates";
+import {
+  CO_OCCURRENCE_NOTE,
+  analyzeDosePatterns,
+  bpMedContext,
+  describeBpMedGap,
+  describeItem,
+  flaggedItems,
+  itemNudge,
+  pageClock,
+} from "./medicine-patterns-calc";
 
 export type TrendDirection = "increasing" | "decreasing" | "stable" | "insufficient_data";
 
@@ -58,6 +72,8 @@ export interface AnomalyItem {
   detectedAt: string;
   /** Which rule fired (for tests and support). */
   rule: string;
+  /** Medicines the item is about (lets the Alert Center avoid saying the same thing twice). */
+  medicineIds?: string[];
 }
 
 export interface MetricTrend {
@@ -452,16 +468,29 @@ export function detectAnomalies(input: AnomalyInput, nowIso: string = new Date()
     });
   }
 
-  // ---- 8. Medicines (real adherence over the last 7 days) ----------------------
+  // ---- 8. Medicines (real adherence over the last 7 days, then repeated gaps) ---------
   const doses7 = input.doses.filter((d) => d.date >= addDaysIST(today, -6) && d.date <= today);
   const adherence = summarizeAdherence(doses7);
   if (input.alerts.medicine) {
+    const bpCtx = bpMedContext({
+      doses: input.doses,
+      readings: input.bp.map((b) => ({ systolic: b.systolic, diastolic: b.diastolic, day: b.day })),
+      thresholds: t,
+      today,
+    });
+    const patterns = analyzeDosePatterns(input.doses, { today, windowDays: PATTERN_WINDOW_DAYS, bp: bpCtx });
+    const clusterStart = addDaysIST(today, -(MISSED_DOSE_CLUSTER_DAYS - 1));
     const cluster = missedDoseCluster(input.doses, today);
     if (cluster.isCluster) {
+      const clusterDoses = input.doses.filter((d) => d.status === "missed" && d.date >= clusterStart && d.date <= today);
+      // One step up when a missed dose is of a medicine whose miss matters most (BP, heart, diabetes, blood
+      // thinner), unless it sits on a day on which nothing at all was recorded (that is a recording gap).
+      const gapDays = new Set(patterns.unrecordedDays.map((g) => g.date));
+      const critical = clusterDoses.some((d) => isCriticalClass(classifyMedicine(d.name)?.class ?? null) && !gapDays.has(d.date));
       anomalies.push({
         id: `anom-med-missed-${today}`,
         metric: "medicine",
-        severity: cluster.count >= 3 ? "IMPORTANT" : "ATTENTION",
+        severity: cluster.count >= 3 || critical ? "IMPORTANT" : "ATTENTION",
         isUrgent: false,
         isRepeated: true,
         title: "Several missed doses recently",
@@ -473,6 +502,70 @@ export function detectAnomalies(input: AnomalyInput, nowIso: string = new Date()
         dataPointsUsed: adherence.evaluated,
         detectedAt: nowIso,
         rule: "missed_dose_cluster",
+        medicineIds: [...new Set(clusterDoses.map((d) => d.medicineId))],
+      });
+    }
+
+    // A medicine that keeps slipping at one time of day or on one weekday. One alert per medicine row, the most
+    // specific rule wins, and a pattern the cluster rule above already says in full is not repeated.
+    let raised = 0;
+    for (const item of flaggedItems(patterns)) {
+      if (raised >= PATTERN_MAX_ALERTS) break;
+      const text = describeItem(item, patterns.windowDays, pageClock);
+      if (!text) continue;
+      if (!item.weekdayPeak && cluster.isCluster && item.missedDates.every((d) => d >= clusterStart)) continue;
+      const byWeekday = item.weekdayPeak !== null;
+      const rule = byWeekday ? "med_pattern_weekday" : "med_pattern_slot";
+      // One fixed pointer: "record it" for a dose nobody wrote down, "ask the doctor or pharmacist" for a marked miss.
+      const nudge = itemNudge(item);
+      anomalies.push({
+        id: `anom-med-${byWeekday ? "weekday" : "slot"}-${item.medicineId}-${today}`,
+        metric: "medicine",
+        severity: "ATTENTION",
+        isUrgent: false,
+        isRepeated: true,
+        title: byWeekday ? "A medicine is often missed or not recorded on one weekday" : "A medicine is often missed or not recorded",
+        titleHi: byWeekday ? "एक दवाई अक्सर एक ही वार को छूटी या दर्ज नहीं हुई" : "एक दवाई बार-बार छूटी या दर्ज नहीं हुई",
+        description: nudge ? `${text.en} ${nudge.en}` : text.en,
+        descriptionHi: nudge ? `${text.hi} ${nudge.hi}` : text.hi,
+        currentValue: `${item.markedMissed + item.notRecorded} of ${item.due} doses`,
+        baselineReference: `Last ${patterns.windowDays} days`,
+        dataPointsUsed: item.due,
+        detectedAt: nowIso,
+        rule,
+        medicineIds: [item.medicineId],
+      });
+      if (raised === 0) bullets.push({ en: text.en, hi: text.hi });
+      raised++;
+    }
+
+    // A BP medicine gap in the same days as readings above target: "happened together", never "caused".
+    if (bpCtx.fires) {
+      const text = describeBpMedGap(bpCtx);
+      anomalies.push({
+        id: `anom-med-bpgap-${today}`,
+        metric: "medicine",
+        severity: bpCtx.severity ?? "ATTENTION",
+        isUrgent: false,
+        isRepeated: true,
+        title: "BP medicine missed or not recorded, and high BP in the same days",
+        titleHi: "बीपी की दवाई छूटी या दर्ज नहीं हुई, और इन्हीं दिनों BP ऊपर रहा",
+        description: `${text.en} Tell the doctor or pharmacist.`,
+        descriptionHi: `${text.hi} डॉक्टर या फार्मासिस्ट को बताएँ।`,
+        currentValue: `${bpCtx.bpMissed} of ${bpCtx.bpDue} BP-medicine doses`,
+        baselineReference: `Last ${bpCtx.days} days`,
+        dataPointsUsed: bpCtx.readings,
+        detectedAt: nowIso,
+        rule: "bp_med_gap_with_high_bp",
+        medicineIds: bpCtx.medicineIds,
+      });
+      multiFactorInsights.push({
+        id: "mf-bp-meds",
+        factors: ["Blood Pressure", "Medicine record"],
+        observation: text.en,
+        observationHi: text.hi,
+        severity: "ATTENTION",
+        note: CO_OCCURRENCE_NOTE.en,
       });
     }
   }

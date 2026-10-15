@@ -25,6 +25,7 @@ import {
   sleepStats,
   weightStats,
 } from "./ledger";
+import { GUIDELINE_TOPICS, guidelineToolResult, isGuidelineTopic, itemsForTopics, type GuidelineItem } from "./guidelines";
 import { cleanFreeText } from "./records";
 import { isValidYMD, startOfISOWeek } from "./temporal";
 import {
@@ -56,6 +57,11 @@ export interface ToolRuntime {
   /** The user's own message explicitly asked to remember something. */
   allowSave: boolean;
   deps: ToolDeps;
+  /**
+   * Smaller results for a tight token budget (the code-prefetched evidence pack): fewer rows, no per-day
+   * tables for long ranges. The statistics are the same; only the listing is shorter.
+   */
+  compact?: boolean;
 }
 
 export interface ToolResult {
@@ -64,6 +70,8 @@ export interface ToolResult {
   dataPoints: number;
   /** Short human label, shown on the evidence chip for results cited as "tool:N". */
   label?: string;
+  /** Curated guideline items this result carries (their urls count as sources; their text bounds the figures). */
+  guidelines?: GuidelineItem[];
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +124,24 @@ const SUBMIT_ANSWER_SCHEMA = obj({
   refusal: { type: "string", description: "Empty string unless you are declining part or all of the request; then say why." },
 });
 
-export function buildToolDefs(opts: { webSearch: boolean }): Anthropic.ToolUnion[] {
+function stripDescriptions<T>(v: T): T {
+  if (Array.isArray(v)) return v.map((x) => stripDescriptions(x)) as unknown as T;
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) if (k !== "description") out[k] = stripDescriptions(val);
+    return out as T;
+  }
+  return v;
+}
+
+/** The answer contract without the prose descriptions: what a one-call JSON reply is constrained to (the guidance lives in the prompt). */
+export function answerJsonSchema(): Record<string, unknown> {
+  return stripDescriptions(SUBMIT_ANSWER_SCHEMA) as unknown as Record<string, unknown>;
+}
+
+export const GUIDELINE_TOOL_NAME = "search_guidelines";
+
+export function buildToolDefs(opts: { webSearch: boolean; guidelines?: boolean }): Anthropic.ToolUnion[] {
   const tools: Anthropic.ToolUnion[] = [
     {
       name: "get_overview",
@@ -182,6 +207,17 @@ export function buildToolDefs(opts: { webSearch: boolean }): Anthropic.ToolUnion
       strict: true,
       input_schema: obj({ kind: { type: "string", enum: [...MEMORY_KINDS] }, content: { type: "string", description: "Max 500 characters, in the family's own words." } }),
     },
+    ...(opts.guidelines
+      ? [
+          {
+            name: GUIDELINE_TOOL_NAME,
+            description:
+              "Returns the app's own checked health guidance (WHO, NHLBI, NHS, ICMR-NIN) for one topic: short summaries with the publisher, title, url and the exact figures. Use it for advice questions (salt, diet, blood pressure lifestyle, activity, sleep, measuring BP, stroke signs, stroke prevention, taking medicines as prescribed, weight). Cite the url in a recommendation with basis=guideline and list it in sources[]; repeat only the figures it contains.",
+            strict: true,
+            input_schema: obj({ topic: { type: "string", enum: [...GUIDELINE_TOPICS] } }),
+          } satisfies Anthropic.Tool,
+        ]
+      : []),
     {
       name: "submit_answer",
       description:
@@ -212,6 +248,8 @@ export const TOOL_LABEL_HI: Record<string, string> = {
   list_memories: "सेव की गई बातें देख रहा हूँ",
   save_memory: "बात सेव कर रहा हूँ",
   web_search: "इंटरनेट पर खोज",
+  search_guidelines: "सेहत-गाइडलाइन देख रहा हूँ",
+  prefetch: "आपके आँकड़े इकट्ठा कर रहा हूँ",
   submit_answer: "जवाब की जाँच",
 };
 
@@ -366,10 +404,14 @@ function queryLogs(rt: ToolRuntime, input: Record<string, unknown>): ToolResult 
   const metric = input.metric as Metric;
   if (!(METRICS as readonly string[]).includes(metric)) return fail(`metric must be one of ${METRICS.join(", ")}`);
   const aggregate = input.aggregate === "daily" || input.aggregate === "weekly" ? input.aggregate : "raw";
-  const limit = Math.min(300, Math.max(1, Math.round(typeof input.limit === "number" && Number.isFinite(input.limit) ? input.limit : 100)));
+  const cap = rt.compact ? 14 : 300;
+  const limit = Math.min(cap, Math.max(1, Math.round(typeof input.limit === "number" && Number.isFinite(input.limit) ? input.limit : rt.compact ? 14 : 100)));
   const r = clampRange(rt.ctx, input.from, input.to);
   if (isErr(r)) return fail(r.error);
-  const { rows, total } = rowsFor(rt.ctx, metric, r, aggregate, limit);
+  const listed = rowsFor(rt.ctx, metric, r, aggregate, limit);
+  const total = listed.total;
+  // Grouped rows come oldest first: a compact listing keeps the newest ones.
+  const rows = rt.compact && aggregate !== "raw" && listed.rows.length > limit ? listed.rows.slice(-limit) : listed.rows;
   const notes = [...r.notes];
   if (aggregate === "raw" && total > rows.length) notes.push(`Only the newest ${rows.length} of ${total} rows are shown; narrow the range or use aggregate=daily/weekly for the rest.`);
   const trunc = rt.ctx.truncated[metric];
@@ -422,7 +464,7 @@ function medicineAdherence(rt: ToolRuntime, input: Record<string, unknown>): Too
   const rows = inRange(rt.ctx.doses, r.from, r.to).filter((d) => !medId || d.medicineId === medId);
   const notes = [...r.notes, "Dose rule: a dose with no log more than 240 minutes after its schedule counts as missed; pending means still within the window.", "Inactive medicines count only on days that have a real log (their stop date is unknown)."];
   if (rt.ctx.medicines.length === 0) notes.push("No medicines are recorded for this patient.");
-  const exceptions = rows.filter((d) => d.status === "late" || d.status === "missed").slice(-60).map((d) => ({ ref: d.ref, date: d.date, medicine: d.medicineName, scheduled: d.scheduled, status: d.status, auto_counted_missed: d.source === "auto_missed" }));
+  const exceptions = rows.filter((d) => d.status === "late" || d.status === "missed").slice(rt.compact ? -10 : -60).map((d) => ({ ref: d.ref, date: d.date, medicine: d.medicineName, scheduled: d.scheduled, status: d.status, auto_counted_missed: d.source === "auto_missed" }));
   return ok({ window: { from: r.from, to: r.to, days: r.days }, medicine: medName ?? "all", stats: st, late_or_missed_doses: exceptions, notes }, rows.length, `medicine adherence (${medName ?? "all"}) ${r.from} to ${r.to}`);
 }
 
@@ -433,7 +475,13 @@ function nutritionBreakdown(rt: ToolRuntime, input: Record<string, unknown>): To
   const notes = [...r.notes, "Means are over days that have any food logged, not over all days in the range.", "Sodium is a lower bound when sodium_coverage_pct is below 100: items without sodium data add nothing."];
   if (rt.ctx.truncated.food) notes.push("Food history hit a hard load ceiling: older rows in the range may be missing.");
   if (st.items === 0) notes.push("No food is logged in this range. Say so; do not guess.");
-  return ok({ window: { from: r.from, to: r.to, days: r.days }, stats: st, per_day: st.perDay.slice(-120), notes }, st.items, `nutrition ${r.from} to ${r.to}`);
+  return ok({ window: { from: r.from, to: r.to, days: r.days }, stats: st, per_day: st.perDay.slice(rt.compact ? -10 : -120), notes }, st.items, `nutrition ${r.from} to ${r.to}`);
+}
+
+function searchGuidelines(input: Record<string, unknown>): ToolResult {
+  if (!isGuidelineTopic(input.topic)) return fail(`topic must be one of ${GUIDELINE_TOPICS.join(", ")}`);
+  const items = itemsForTopics([input.topic], 3);
+  return { content: guidelineToolResult(input.topic, items), isError: false, dataPoints: items.length, label: `guidelines: ${input.topic}`, guidelines: items };
 }
 
 function listMemories(rt: ToolRuntime): ToolResult {
@@ -473,6 +521,8 @@ export async function executeTool(name: string, input: unknown, rt: ToolRuntime)
         return nutritionBreakdown(rt, args);
       case "list_memories":
         return listMemories(rt);
+      case GUIDELINE_TOOL_NAME:
+        return searchGuidelines(args);
       case "save_memory":
         return await saveMemory(rt, args);
       default:

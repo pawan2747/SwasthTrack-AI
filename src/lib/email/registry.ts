@@ -5,7 +5,9 @@
  * from this list: add an entry and it shows up in both.
  */
 
+import { DOCTOR_QUESTIONS, MEDICINE_SAFETY_LINE, NUDGES } from "@/lib/medicine-format";
 import type { MonthlyReportSummary, WeeklyReportSummary } from "@/services/reports-analytics-service";
+import { medicineInsightAlert } from "./ai-blocks";
 import { fillRecipient } from "./layout";
 import {
   renderAccessChangedEmail,
@@ -29,12 +31,17 @@ export type EmailTemplateKey =
   | "alert.bp.crisis"
   | "alert.bp.high"
   | "alert.bp.low"
+  | "alert.bp.high.dose"
   | "alert.reminder"
   | "alert.reminder.no-data"
+  | "alert.reminder.yesterday"
   | "alert.weight"
   | "report.daily"
+  | "report.daily.ai"
   | "report.weekly"
+  | "report.weekly.ai"
   | "report.monthly"
+  | "report.monthly.ai"
   | "account.welcome"
   | "account.test"
   | "caregiver.invite"
@@ -118,6 +125,16 @@ const sampleMonthly: MonthlyReportSummary = {
   ],
 };
 
+/** Hindi + English twin of a medicine pattern note, with the fixed closing lines the code appends. */
+const sampleNote = (days: number, of: number, n: number) => ({
+  hi: `Telma 40 की रात 9 बजे की खुराक पिछले ${days} दिनों में ${of} में से ${n} बार दर्ज नहीं हुई।`,
+  en: `Telma 40 (9 PM dose) was not recorded ${n} of ${of} times in the last ${days} days.`,
+  closing: {
+    hi: `${NUDGES.tick_if_taken.hi} ${MEDICINE_SAFETY_LINE.hi}`,
+    en: `${NUDGES.tick_if_taken.en} ${MEDICINE_SAFETY_LINE.en}`,
+  },
+});
+
 export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   {
     key: "alert.bp.crisis",
@@ -142,6 +159,19 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     trigger: "Right after a BP reading is saved below the patient's low line. To the patient's owner and caregivers.",
     sample: (o) =>
       done(renderBpAlertEmail({ patientName: PATIENT, level: "low", value: "88/56", pulse: 72, slot: "morning", timeLabel: "7:42 AM", outOfRange7d: 1 }, { ...sample, ...o })),
+  },
+  {
+    key: "alert.bp.high.dose",
+    category: "alert",
+    label: "BP alert — high, with the BP-medicine record",
+    trigger: "Same alert as alert.bp.high; when the patient has a BP medicine, one more row says how many of its doses in the last 3 days were recorded as taken.",
+    sample: (o) =>
+      done(
+        renderBpAlertEmail(
+          { patientName: PATIENT, level: "high", value: "152/96", pulse: 84, slot: "evening", timeLabel: "8:10 PM", outOfRange7d: 2, doseContext: { days: 3, due: 4, adherent: 2 } },
+          { ...sample, ...o },
+        ),
+      ),
   },
   {
     key: "alert.reminder",
@@ -188,6 +218,29 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
               { hi: "वज़न", en: "Weight" },
             ],
             daysWithoutData: 4,
+          },
+          { ...sample, ...o },
+        ),
+      ),
+  },
+  {
+    key: "alert.reminder.yesterday",
+    category: "alert",
+    label: "Reminder — yesterday's doses + medicine pattern",
+    trigger:
+      "Same 2 PM reminder. Yesterday's left-over doses (any time of day) get a row tagged \"Yesterday\"; a medicine pattern note follows. A mail exists only for something unresolved today or yesterday, or an important-tier pattern on an escalation milestone (2, 4, 7 in a row).",
+    sample: (o) =>
+      done(
+        renderReminderEmail(
+          {
+            patientName: PATIENT,
+            when: { hi: "आज, दोपहर 2 बजे", en: "Today, 2 PM" },
+            missedMedicines: [{ name: "Amlodipine", sub: "5 mg · सुबह 8 बजे · 8 AM" }],
+            yesterdayMissed: [{ name: "Telma 40", sub: "रात 9 बजे · 9 PM · दर्ज नहीं हुई · Not recorded" }],
+            missingRecords: [{ hi: "सुबह का बीपी", en: "Morning BP" }],
+            daysWithoutData: null,
+            medicineInsight: medicineInsightAlert(sampleNote(14, 13, 3), "ATTENTION"),
+            aiAssisted: true,
           },
           { ...sample, ...o },
         ),
@@ -260,6 +313,42 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       ),
   },
   {
+    key: "report.daily.ai",
+    category: "report",
+    label: "Daily report — with the day's paragraph and medicine pattern",
+    trigger:
+      "Same 9 PM report. When the family allowed AI text: one verified paragraph at the top, the medicine pattern note under \"Needs attention\", and a footer line saying a model helped word it. Without consent, quota or time the report is the plain one above.",
+    sample: (o) =>
+      done(
+        renderDailyReport(
+          {
+            patientName: PATIENT,
+            date: { hi: "सोमवार, 5 अक्टूबर", en: "Mon, 5 Oct" },
+            alerts: [],
+            bpReadings: [
+              { slot: "morning", timeLabel: "7:42 AM", pulse: 74, value: "128/82", tone: "normal" },
+              { slot: "evening", timeLabel: "8:10 PM", pulse: 78, value: "126/80", tone: "normal" },
+            ],
+            medicines: { total: 4, taken: 4, missed: [], pending: [] },
+            calories: { eaten: 1560, target: 1800, meals: [{ hi: "नाश्ता", en: "Breakfast" }, { hi: "दोपहर का खाना", en: "Lunch" }, { hi: "रात का खाना", en: "Dinner" }] },
+            steps: 5210,
+            sleepHours: 7,
+            weightKg: 71.9,
+            notLogged: [],
+            summary: {
+              headline: { hi: "रमेश का आज का हाल", en: "Ramesh's update for today" },
+              body: {
+                hi: "सुबह का BP 128/82 और शाम का BP 126/80 दर्ज है। आज की सभी 4/4 दवाइयाँ दर्ज हैं और 1,560 kcal का भोजन दर्ज है।",
+                en: "The morning BP 128/82 and the evening BP 126/80 are recorded. All 4/4 of today's medicines are recorded and 1,560 kcal of food is recorded.",
+              },
+            },
+            medicineInsight: medicineInsightAlert(sampleNote(14, 13, 3), "ATTENTION"),
+          },
+          { ...sample, ...o },
+        ),
+      ),
+  },
+  {
     key: "report.weekly",
     category: "report",
     label: "Weekly report",
@@ -268,12 +357,78 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       done(renderWeeklyReport({ patientName: PATIENT, summary: sampleWeekly, bpAverage: { systolic: 134, diastolic: 86 }, bpAlertCount: 2 }, { ...sample, ...o })),
   },
   {
+    key: "report.weekly.ai",
+    category: "report",
+    label: "Weekly report — with the week's note and medicine pattern",
+    trigger:
+      "Same Sunday report. When the family allowed AI text: a verified note of what changed (the same wording the Reports page shows), the medicine pattern of the week, and the footer line. Otherwise the plain report above.",
+    sample: (o) =>
+      done(
+        renderWeeklyReport(
+          {
+            patientName: PATIENT,
+            summary: sampleWeekly,
+            bpAverage: { systolic: 134, diastolic: 86 },
+            bpAlertCount: 2,
+            narrative: {
+              headline: { hi: "इस हफ़्ते कुछ आँकड़ों में बदलाव दिखा।", en: "Some figures changed this week." },
+              points: [
+                { hi: "औसत BP 134/86 रहा और 2 रीडिंग दायरे से बाहर थीं।", en: "The average BP was 134/86 and 2 readings were outside the range." },
+                { hi: "इस हफ़्ते की 86% दवाइयाँ दर्ज हुईं।", en: "86% of this week's medicines were recorded." },
+              ],
+            },
+            medicineCoach: {
+              hi: sampleNote(7, 7, 2).hi,
+              en: sampleNote(7, 7, 2).en,
+              nudges: [{ hi: NUDGES.tick_if_taken.hi, en: NUDGES.tick_if_taken.en }, { hi: MEDICINE_SAFETY_LINE.hi, en: MEDICINE_SAFETY_LINE.en }],
+              doctorQuestions: [{ hi: DOCTOR_QUESTIONS.remember_help.hi, en: DOCTOR_QUESTIONS.remember_help.en }],
+              ai: true,
+            },
+          },
+          { ...sample, ...o },
+        ),
+      ),
+  },
+  {
     key: "report.monthly",
     category: "report",
     label: "Monthly report (last 30 days)",
     trigger: "Cron, 9 AM IST on the 1st of every month. To the patient's owner and caregivers.",
     sample: (o) =>
       done(renderMonthlyReport({ patientName: PATIENT, summary: sampleMonthly, bpAverage: { systolic: 136, diastolic: 87 }, bpAlertCount: 7 }, { ...sample, ...o })),
+  },
+  {
+    key: "report.monthly.ai",
+    category: "report",
+    label: "Monthly report — with the month's note and medicine pattern",
+    trigger:
+      "Same report on the 1st. When the family allowed AI text: a verified note of the month, the medicine pattern of the last 30 days, and the footer line. Otherwise the plain report above.",
+    sample: (o) =>
+      done(
+        renderMonthlyReport(
+          {
+            patientName: PATIENT,
+            summary: sampleMonthly,
+            bpAverage: { systolic: 136, diastolic: 87 },
+            bpAlertCount: 7,
+            narrative: {
+              headline: { hi: "पिछले 30 दिनों में कुछ आँकड़ों में बदलाव दिखा।", en: "Some figures changed over the last 30 days." },
+              points: [
+                { hi: "वज़न 72.8 kg से 71.9 kg हुआ।", en: "Weight went from 72.8 kg to 71.9 kg." },
+                { hi: "बीपी 49 बार दर्ज हुआ और 7 रीडिंग दायरे से बाहर थीं।", en: "BP was recorded 49 times and 7 readings were outside the range." },
+              ],
+            },
+            medicineCoach: {
+              hi: sampleNote(30, 29, 5).hi,
+              en: sampleNote(30, 29, 5).en,
+              nudges: [{ hi: NUDGES.tick_if_taken.hi, en: NUDGES.tick_if_taken.en }, { hi: MEDICINE_SAFETY_LINE.hi, en: MEDICINE_SAFETY_LINE.en }],
+              doctorQuestions: [{ hi: DOCTOR_QUESTIONS.remember_help.hi, en: DOCTOR_QUESTIONS.remember_help.en }],
+              ai: true,
+            },
+          },
+          { ...sample, ...o },
+        ),
+      ),
   },
   {
     key: "account.welcome",

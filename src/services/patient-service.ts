@@ -613,6 +613,15 @@ export async function getAllActiveFoods(): Promise<FoodItem[]> {
   return request;
 }
 
+/**
+ * The search index over the bundled catalogue plus the person's custom foods, for callers that need the scores
+ * (the typed-meal parser decides "matched / ambiguous / unmatched" from them; searchFoodItems() hides them).
+ */
+export async function getFoodIndex(): Promise<FoodIndex<FoodItem>> {
+  const foods = await getAllActiveFoods();
+  return _foodsIndex ?? buildIndex(foods);
+}
+
 export function invalidateFoodsCache(): void {
   _foodsCache = null;
   _foodsIndex = null;

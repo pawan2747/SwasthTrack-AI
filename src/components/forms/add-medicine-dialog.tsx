@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Pill } from "lucide-react";
+import { Camera, ClipboardPaste, Pill } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Select, TextInput } from "@/components/ui/form-field";
 import { Modal } from "@/components/ui/modal";
+import { MedicinePhotoDialog, useMedicinePhotoOffer } from "@/components/vision/medicine-photo-dialog";
 import { useAuth } from "@/context/auth-context";
 import { notifyMedicinesChanged } from "@/hooks/use-medicine-marking";
 import { MEAL_RELATIONS, MEDICINE_FREQUENCIES, normalizeMealRelation } from "@/lib/medicine-format";
@@ -38,6 +39,9 @@ function MedicineDialogBody({ isOpen, onClose, patientId, medicineToEdit, onSucc
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  // Adding (not editing): several medicines from a prescription photo, or from pasted prescription text.
+  const [rxOpen, setRxOpen] = useState(false);
+  const rx = useMedicinePhotoOffer(medicineToEdit ? null : patientId);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -100,6 +104,17 @@ function MedicineDialogBody({ isOpen, onClose, patientId, medicineToEdit, onSucc
         </div>
       }
     >
+      {!medicineToEdit && canWrite ? (
+        <div className="mb-4 space-y-1.5">
+          <Button variant="secondary" block onClick={() => setRxOpen(true)}>
+            {rx.photoOffered ? <Camera aria-hidden className="h-4 w-4" /> : <ClipboardPaste aria-hidden className="h-4 w-4" />}
+            <span lang="hi">{rx.photoOffered ? "पर्ची या दवाई की फोटो से जोड़ें" : "पर्ची का पाठ चिपकाकर जोड़ें"}</span>
+          </Button>
+          <p lang="en" className="text-center text-xs text-ink-muted">
+            {rx.photoOffered ? "Add several medicines from a photo of the prescription" : "Add several medicines from pasted prescription text"}
+          </p>
+        </div>
+      ) : null}
       <form id={FORM_ID} onSubmit={handleSubmit} noValidate className="space-y-4">
         {!canWrite ? (
           <p role="status" lang="hi" className="rounded-card border border-info-line bg-info-soft p-3 text-sm text-info">
@@ -182,6 +197,18 @@ function MedicineDialogBody({ isOpen, onClose, patientId, medicineToEdit, onSucc
           </span>
         </label>
       </form>
+      {!medicineToEdit ? (
+        <MedicinePhotoDialog
+          isOpen={rxOpen}
+          onClose={() => setRxOpen(false)}
+          patientId={patientId}
+          onDone={() => {
+            // The caller shows its confirmation and refreshes; the photo dialog already told the medicine lists.
+            onSuccess?.();
+            onClose();
+          }}
+        />
+      ) : null}
     </Modal>
   );
 }

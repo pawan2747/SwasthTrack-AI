@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookMarked,
   CircleAlert,
-  Globe,
   History,
   Leaf,
   MessageSquarePlus,
@@ -21,14 +20,18 @@ import {
   HeartPulse,
   type LucideIcon,
 } from "lucide-react";
+import { AskAiStatus } from "@/components/ask/ai-status";
 import { AnswerCard } from "@/components/ask/answer-card";
+import { emergencyReasonsIn, logChipDecision, questionBefore } from "@/components/ask/ask-ui";
 import { Composer } from "@/components/ask/composer";
+import { EmergencyBanner } from "@/components/ask/emergency-banner";
+import { LogChip } from "@/components/ask/log-chip";
 import { MemoriesManager } from "@/components/ask/memories-manager";
 import { ProgressCard } from "@/components/ask/progress";
 import { SessionDrawer } from "@/components/ask/session-drawer";
 import { TracePanel } from "@/components/ask/trace-panel";
 import { saveFeedback, useSoie, type AssistantMsg, type ErrorMsg } from "@/components/ask/use-soie";
-import { Badge } from "@/components/ui/badge";
+import { VoiceLogDialog } from "@/components/voicelog/voice-log-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, metricChipClasses, type MetricTone } from "@/components/ui/card";
 import { Field, Select } from "@/components/ui/form-field";
@@ -37,6 +40,7 @@ import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/context/auth-context";
 import { authFetch } from "@/lib/db/auth-fetch";
 import { cn } from "@/lib/utils";
+import { getMedicines } from "@/services/patient-service";
 
 const QUICK_PROMPTS: Array<{ icon: LucideIcon; tone: MetricTone; text: string }> = [
   { icon: Sparkles, tone: "brand", text: "आज का हाल बताइए" },
@@ -49,6 +53,7 @@ const QUICK_PROMPTS: Array<{ icon: LucideIcon; tone: MetricTone; text: string }>
   { icon: Scale, tone: "weight", text: "वज़न लक्ष्य से कितना दूर है?" },
 ];
 
+/** GET /api/soie: what the server can do right now (the family's own switch is read separately). */
 interface EngineInfo {
   ai: boolean;
   webSearch: boolean;
@@ -120,11 +125,18 @@ function AskSession() {
   const [engine, setEngine] = useState<EngineInfo | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [memoriesOpen, setMemoriesOpen] = useState(false);
+  // The fixed 112 / 108 card above the composer: set when a sent message names an emergency symptom.
+  const [emergencyShown, setEmergencyShown] = useState(false);
+  // The words the "इसे रिकॉर्ड में दर्ज करें" chip hands to the say-or-type sheet (null = sheet closed).
+  const [logText, setLogText] = useState<string | null>(null);
+  const [medicineNames, setMedicineNames] = useState<string[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
   const patientName = authorizedPatients.find((p) => p.id === activePatientId)?.name ?? null;
+  // Recording from here needs the same right as every other form; a viewer never gets the chip.
+  const canLog = canWrite && memberRole !== "viewer";
 
-  // What the server can really do right now (key present? web search on?). Drives the honest engine notice.
+  // What the server can really do right now (is AI configured for Ask? web search on?). Feeds the honest status block.
   useEffect(() => {
     let live = true;
     (async () => {
@@ -141,6 +153,22 @@ function AskSession() {
       live = false;
     };
   }, [activePatientId]);
+
+  // The patient's medicine names let the rules recognise "amlodipine le li" as a dose. Read once, only for people who can record.
+  useEffect(() => {
+    if (!activePatientId || !canLog) return;
+    let live = true;
+    getMedicines(activePatientId)
+      .then((rows) => {
+        if (live) setMedicineNames(rows.filter((r) => r.active).map((r) => r.medicine_name));
+      })
+      .catch(() => {
+        // names only sharpen the chip; without them it simply stays quieter
+      });
+    return () => {
+      live = false;
+    };
+  }, [activePatientId, canLog]);
 
   // Follow the conversation, but never yank the empty screen around on first paint.
   const messageCount = chat.messages.length;
@@ -163,8 +191,39 @@ function AskSession() {
 
   const noPatient = !loading && !activePatientId;
   const stage = chat.live?.stage ?? "reading";
-  const lastAnswerId = [...chat.messages].reverse().find((m) => m.role === "assistant")?.id;
+  const lastAnswer = [...chat.messages].reverse().find((m): m is AssistantMsg => m.role === "assistant");
+  const lastAnswerId = lastAnswer?.id;
   const firstName = patientName?.trim().split(/\s+/)[0];
+
+  // Which of this visit's messages state a reading or a dose (rules only, in the browser, no model).
+  const chipIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!canLog) return ids;
+    for (const m of chat.messages) {
+      if (m.role !== "user" || m.stored) continue;
+      if (logChipDecision(m.text, { canWrite: true, at: m.at, medicineNames }).show) ids.add(m.id);
+    }
+    return ids;
+  }, [chat.messages, canLog, medicineNames]);
+
+  // Every question goes through here: an emergency symptom shows the fixed card at once, and the message is
+  // still sent (the server's own emergency answer follows). A re-ask of a question already sent is not re-checked.
+  const send = chat.send;
+  const sending = chat.sending;
+  const ask = useCallback(
+    (text: string, opts?: { resend?: boolean }): Promise<void> => {
+      if (sending) return Promise.resolve();
+      if (!opts?.resend && emergencyReasonsIn(text).length > 0) setEmergencyShown(true);
+      return send(text, opts);
+    },
+    [send, sending],
+  );
+  const reask = useCallback((q: string) => void ask(q, { resend: true }), [ask]);
+  const reset = chat.reset;
+  const newConversation = useCallback(() => {
+    setEmergencyShown(false);
+    reset();
+  }, [reset]);
 
   return (
     <PageBody>
@@ -175,7 +234,7 @@ function AskSession() {
         description="आपके दर्ज किए आँकड़ों से सीधा जवाब। आँकड़े कोड से गिने जाते हैं और हर जवाब में उनका प्रमाण दिखता है।"
         actions={
           <>
-            <HeaderAction label="नई बातचीत" icon={MessageSquarePlus} onClick={chat.reset} disabled={noPatient} />
+            <HeaderAction label="नई बातचीत" icon={MessageSquarePlus} onClick={newConversation} disabled={noPatient} />
             <HeaderAction label="पुरानी बातचीत" icon={History} onClick={() => setHistoryOpen(true)} disabled={noPatient} />
             <HeaderAction label="सेव की गई बातें" icon={BookMarked} onClick={() => setMemoriesOpen(true)} disabled={noPatient} />
           </>
@@ -203,21 +262,8 @@ function AskSession() {
           </p>
         ) : null}
 
-        {engine ? (
-          engine.ai ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-muted">
-              <Badge variant={engine.webSearch ? "gold" : "brand"}>
-                {engine.webSearch ? <Globe aria-hidden className="h-3 w-3" /> : <Sparkles aria-hidden className="h-3 w-3" />}
-                <span lang="hi">{engine.webSearch ? "AI + इंटरनेट खोज चालू" : "AI चालू · इंटरनेट खोज बंद"}</span>
-              </Badge>
-              <span lang="hi">हर आँकड़ा जवाब देने से पहले आपके डेटा से मिलाकर जाँचा जाता है।</span>
-            </div>
-          ) : (
-            <Card tone="sunken" className="flex items-start gap-2.5 text-sm text-ink-muted">
-              <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" />
-              <p lang="hi">AI अभी चालू नहीं है (सर्वर पर API कुंजी सेट नहीं है)। जवाब नियम-आधारित इंजन से आएँगे: सिर्फ़ आपके दर्ज आँकड़ों से, बिना इंटरनेट खोज के और खुले सवालों की सलाह के बिना।</p>
-            </Card>
-          )
+        {activePatientId && !noPatient ? (
+          <AskAiStatus patientId={activePatientId} server={engine} lastNotices={lastAnswer && lastAnswer.status !== "stored" ? lastAnswer.answer.notices : null} />
         ) : null}
 
         {noPatient ? (
@@ -243,7 +289,7 @@ function AskSession() {
                   क्या जानना है?
                 </h2>
                 <p lang="hi" className="mt-1 text-sm text-ink-muted">
-                  BP, वज़न, खाना, नींद, कदम और दवाइयों के बारे में पूछिए। खान-पान या जीवनशैली की समस्या पर AI चालू हो तो इंटरनेट से भरोसेमंद स्रोत देखकर योजना भी बताएगा।
+                  BP, वज़न, खाना, नींद, कदम और दवाइयों के बारे में पूछिए। खान-पान या जीवनशैली की समस्या पर AI चालू हो तो WHO, NHS जैसे जाँचे हुए स्रोतों के आधार पर योजना भी बताएगा।
                 </p>
               </div>
             </div>
@@ -257,7 +303,7 @@ function AskSession() {
                   <li key={text}>
                     <button
                       type="button"
-                      onClick={() => void chat.send(text)}
+                      onClick={() => void ask(text)}
                       className="tile pressable flex min-h-control w-full cursor-pointer items-center gap-3 rounded-card px-3 py-2.5 text-left transition-colors hover:border-gold-line hover:bg-surface"
                     >
                       <span className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-field", metricChipClasses[tone])}>
@@ -274,21 +320,24 @@ function AskSession() {
 
             <p lang="hi" className="flex items-start gap-2 text-xs text-ink-muted">
               <ShieldCheck aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              आपके फीडबैक और सेव की गई बातें अगले जवाबों में इस्तेमाल होती हैं।
+              सेव की गई बातें उनके बारे में पूछने पर काम आती हैं; AI चालू हो तो आपके फीडबैक भी अगले जवाबों में काम आते हैं।
             </p>
           </Card>
         ) : (
           <div role="log" aria-label="बातचीत" className="space-y-4">
-            {chat.messages.map((m) => {
+            {chat.messages.map((m, index) => {
               if (m.role === "user") {
                 return (
-                  <div key={m.id} className="flex justify-end">
-                    <p
-                      lang="hi"
-                      className="surface-lift max-w-[88%] whitespace-pre-line break-words rounded-card rounded-br-sm px-4 py-2.5 text-base text-ink sm:max-w-[75%]"
-                    >
-                      {m.text}
-                    </p>
+                  <div key={m.id} className="space-y-1.5">
+                    <div className="flex justify-end">
+                      <p
+                        lang="hi"
+                        className="surface-lift max-w-[88%] whitespace-pre-line break-words rounded-card rounded-br-sm px-4 py-2.5 text-base text-ink sm:max-w-[75%]"
+                      >
+                        {m.text}
+                      </p>
+                    </div>
+                    {chipIds.has(m.id) ? <LogChip onOpen={() => setLogText(m.text)} /> : null}
                   </div>
                 );
               }
@@ -301,7 +350,10 @@ function AskSession() {
                     feedback={m.feedback}
                     canRate={m.status !== "stored" || Boolean(m.messageId)}
                     onFeedback={(r, c) => rate(m, r, c)}
-                    onAsk={chat.send}
+                    onAsk={ask}
+                    patientId={activePatientId}
+                    question={questionBefore(chat.messages, index)}
+                    onReask={reask}
                   />
                   {isAdmin && m.trace ? <TracePanel trace={m.trace} /> : null}
                 </div>
@@ -326,9 +378,10 @@ function AskSession() {
           className="mt-auto"
           disabled={noPatient || loading}
           sending={chat.sending}
-          onSend={chat.send}
+          onSend={ask}
           onCancel={chat.cancel}
           patientFirstName={firstName}
+          above={emergencyShown ? <EmergencyBanner onDismiss={() => setEmergencyShown(false)} /> : undefined}
         />
       </div>
 
@@ -338,9 +391,12 @@ function AskSession() {
         patientId={activePatientId}
         activeId={chat.sessionId}
         onOpen={chat.loadSession}
-        onNew={chat.reset}
+        onNew={newConversation}
       />
       <MemoriesManager isOpen={memoriesOpen} onClose={() => setMemoriesOpen(false)} patientId={activePatientId} canWrite={canWrite && memberRole !== "viewer"} />
+      {activePatientId && canLog ? (
+        <VoiceLogDialog isOpen={logText !== null} onClose={() => setLogText(null)} patientId={activePatientId} initialText={logText ?? undefined} />
+      ) : null}
     </PageBody>
   );
 }

@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { cronAuthorized } from "@/lib/email/cron-auth";
 import { getSampleRecipients, sendMail } from "@/lib/email/mailer";
 import { EMAIL_TEMPLATES, getEmailTemplate } from "@/lib/email/registry";
 
@@ -6,12 +6,7 @@ export const runtime = "nodejs";
 
 /** Open in dev; in production only with `Authorization: Bearer $CRON_SECRET`. */
 function allowed(request: Request): boolean {
-  if (process.env.NODE_ENV !== "production") return true;
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const a = Buffer.from(request.headers.get("authorization") ?? "");
-  const b = Buffer.from(`Bearer ${secret}`);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return process.env.NODE_ENV !== "production" || cronAuthorized(request);
 }
 
 const html = (body: string) =>
@@ -106,10 +101,7 @@ export async function GET(request: Request) {
  * recipient is fixed to the configured address and cannot be chosen by the request.
  */
 export async function POST(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const given = Buffer.from(request.headers.get("authorization") ?? "");
-  const expected = Buffer.from(`Bearer ${secret ?? ""}`);
-  if (!secret || given.length !== expected.length || !timingSafeEqual(given, expected)) {
+  if (!cronAuthorized(request)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

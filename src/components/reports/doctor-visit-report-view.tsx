@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { Printer, Stethoscope } from "lucide-react";
+import { DoctorMedicineTable, DoctorQuestionsBlock, DoctorSynopsisBlock, TrendConsentPrompt } from "@/components/ai/trend-narrative-card";
+import { useTrendNarrative } from "@/components/ai/use-trend-narrative";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,7 +16,8 @@ import { PeriodCharts } from "@/components/reports/period-charts";
 import { ReportSkeleton } from "@/components/reports/report-parts";
 import { safeFileName } from "@/lib/analytics/csv";
 import { buildPeriodCsv } from "@/lib/analytics/export-csv";
-import { classifyBP, istRangeBounds, mean, todayIST } from "@/lib/health-rules";
+import { summarizeBPReadings } from "@/lib/analytics/report-calc";
+import { istRangeBounds, todayIST } from "@/lib/health-rules";
 import { hhmm, mealRelationLabel } from "@/lib/medicine-format";
 import { getBloodPressureLogsInRange, getMedicalConditions, getMedicines, getPatientProfile } from "@/services/patient-service";
 import { getMonthlyReportData } from "@/services/reports-analytics-service";
@@ -83,6 +86,11 @@ export function DoctorVisitReportView({ patientId }: Props) {
     return { period, profile, settings, bpLogs, changes, medicines: medicines.filter((m) => m.active), conditions };
   }, [patientId, days]);
 
+  // The AI synopsis is an addition: with AI off, unasked, unavailable, an urgent alert or too little data
+  // `trend.response` is never "ready" and the document is exactly what it was before.
+  const trend = useTrendNarrative(patientId, { view: "doctor", days }, { enabled: !!data && !error && data.period.daysTrackedCount >= 7 });
+  const readyTrend = trend.response?.status === "ready" ? trend.response : null;
+
   const rangePicker = (
     <Segmented options={RANGE_OPTIONS} value={range} onChange={setRange} ariaLabel="Report range — रिपोर्ट की अवधि" size="sm" />
   );
@@ -112,14 +120,13 @@ export function DoctorVisitReportView({ patientId }: Props) {
   const { period, profile, settings, bpLogs, changes, medicines, conditions } = data;
   const t = settings.bp_targets;
 
-  const sys = bpLogs.map((b) => b.systolic);
-  const dia = bpLogs.map((b) => b.diastolic);
-  const avgSys = mean(sys);
-  const avgDia = mean(dia);
-  const classes = bpLogs.map((b) => ({ log: b, c: classifyBP(b.systolic, b.diastolic, t) }));
-  const aboveTarget = classes.filter((x) => x.c.aboveTarget).length;
+  // One definition of "the BP readings of a period" (impossible entries left out), shared with the written summary.
+  const bp = summarizeBPReadings(bpLogs, t);
+  const avgSys = bp.meanSys;
+  const avgDia = bp.meanDia;
+  const aboveTarget = bp.nAboveTarget;
   // Readings a clinician would want to look at: at or above the alert line, crisis range, or clearly low.
-  const flagged = classes.filter((x) => x.c.exceedsAlert || x.c.category === "crisis" || x.c.category === "low");
+  const flagged = bp.flagged.map(({ reading, classification }) => ({ log: reading, c: classification }));
 
   const coverage = period.totalDays > 0 ? Math.round((period.daysTrackedCount / period.totalDays) * 100) : 0;
   const generated = fmtDateStrYear(todayIST());
@@ -141,7 +148,7 @@ export function DoctorVisitReportView({ patientId }: Props) {
                   ["Average Daily Wellness Score (days with data)", period.daysTrackedCount > 0 ? `${period.averageScore}/100` : "Not enough data"],
                   ["Days with data", `${period.daysTrackedCount}/${period.totalDays}`],
                   ["Medicine Adherence (taken + late of due doses)", period.hasMedicineData ? `${period.medicineAdherencePercent}%` : "No doses due"],
-                  ["BP readings", bpLogs.length],
+                  ["BP readings", bp.n],
                   ["Average BP (mmHg)", avgSys !== null && avgDia !== null ? `${Math.round(avgSys)}/${Math.round(avgDia)}` : "N/A"],
                   ["Average Daily Steps", period.averageSteps ?? "N/A"],
                   ["Average Daily Calories (kcal)", period.averageCalories ?? "N/A"],
@@ -205,6 +212,12 @@ export function DoctorVisitReportView({ patientId }: Props) {
           </span>
         </p>
 
+        {readyTrend ? (
+          <DoctorSynopsisBlock response={readyTrend} />
+        ) : trend.canOfferConsent ? (
+          <TrendConsentPrompt patientId={patientId} onDecided={(granted) => granted && trend.reload()} />
+        ) : null}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Block title="Blood pressure">
             <Row
@@ -212,23 +225,12 @@ export function DoctorVisitReportView({ patientId }: Props) {
               hindiLabel="औसत"
               value={avgSys !== null && avgDia !== null ? `${Math.round(avgSys)}/${Math.round(avgDia)} mmHg` : DASH}
             />
-            <Row label="Readings recorded" hindiLabel="रीडिंग" value={`${bpLogs.length}`} />
-            <Row
-              label="Highest reading"
-              hindiLabel="सबसे ऊँची"
-              value={
-                bpLogs.length
-                  ? (() => {
-                      const top = bpLogs.reduce((a, b) => (b.systolic > a.systolic ? b : a));
-                      return `${top.systolic}/${top.diastolic} mmHg`;
-                    })()
-                  : DASH
-              }
-            />
+            <Row label="Readings recorded" hindiLabel="रीडिंग" value={`${bp.n}`} />
+            <Row label="Highest reading" hindiLabel="सबसे ऊँची" value={bp.highest ? `${bp.highest.systolic}/${bp.highest.diastolic} mmHg` : DASH} />
             <Row
               label={`At/above target (${t.target_systolic}/${t.target_diastolic})`}
               hindiLabel="लक्ष्य से ऊपर"
-              value={bpLogs.length ? `${aboveTarget} of ${bpLogs.length}` : DASH}
+              value={bp.n ? `${aboveTarget} of ${bp.n}` : DASH}
             />
           </Block>
 
@@ -310,6 +312,8 @@ export function DoctorVisitReportView({ patientId }: Props) {
           </Block>
         ) : null}
 
+        {readyTrend ? <DoctorMedicineTable rows={readyTrend.medicineTable} /> : null}
+
         <div className="break-inside-avoid">
           <PeriodCharts trend={period.trend} targets={period.targets} include={["bp", "weight"]} gridClass="lg:grid-cols-2 print:grid-cols-1" />
         </div>
@@ -320,7 +324,7 @@ export function DoctorVisitReportView({ patientId }: Props) {
           </h3>
           {flagged.length === 0 ? (
             <p className="text-sm text-ink-muted">
-              {bpLogs.length === 0 ? "No BP readings recorded in this period." : "No readings were flagged in this period."}
+              {bp.n === 0 ? "No BP readings recorded in this period." : "No readings were flagged in this period."}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -358,6 +362,8 @@ export function DoctorVisitReportView({ patientId }: Props) {
           )}
         </div>
 
+        {readyTrend ? <DoctorQuestionsBlock response={readyTrend} /> : null}
+
         {/* Limitations: lets a clinician judge how much weight the numbers deserve. */}
         <div className="break-inside-avoid rounded-card border border-attention-line bg-attention-soft p-4">
           <h3 className="text-sm font-semibold text-ink">Limitations of this summary</h3>
@@ -368,6 +374,11 @@ export function DoctorVisitReportView({ patientId }: Props) {
               untracked days.
             </li>
             <li>• Blood pressure is measured with a home device at variable times of day.</li>
+            {bp.excluded > 0 ? (
+              <li>
+                • {bp.excluded} BP {bp.excluded === 1 ? "entry" : "entries"} with impossible values {bp.excluded === 1 ? "was" : "were"} left out of the figures above.
+              </li>
+            ) : null}
             <li>• This document contains no diagnosis, interpretation, or treatment recommendation.</li>
           </ul>
         </div>

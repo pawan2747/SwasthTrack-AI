@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { MeasuredAtFields, hourOfTime, nowIST, resolveMeasuredAt } from "@/components/forms/measured-at-fields";
 import { useAuth } from "@/context/auth-context";
 import { MEAL_SLOTS } from "@/components/food/food-math";
+import { MealTextBox } from "@/components/food/meal-text-box";
 import { FoodPhotoDialog } from "@/components/vision/food-photo-dialog";
 import { todayIST } from "@/lib/health-rules";
 import { cn, getExactFoodEmoji } from "@/lib/utils";
@@ -363,6 +364,22 @@ function FoodDialogBody({ isOpen, onClose, patientId, defaultMealType, onSuccess
         ) : null}
 
         {canWrite ? (
+          <MealTextBox
+            compact
+            patientId={patientId}
+            mealType={mealType}
+            logDate={when.date || todayIST()}
+            consumedAt={resolveMeasuredAt(when.date, when.time).instant?.toISOString()}
+            // Always refresh the page behind; close only when the whole meal is in. On a partial save the review list
+            // (what failed, what still needs a food) is the only place that says so, and closing would unmount it.
+            onLogged={({ complete }) => {
+              onSuccess?.();
+              if (complete) onClose();
+            }}
+          />
+        ) : null}
+
+        {canWrite ? (
           <Button variant="secondary" block onClick={() => setPhotoOpen(true)}>
             <Camera aria-hidden className="h-4 w-4" />
             <span lang="hi">खाने की फोटो से दर्ज करें</span>
@@ -375,9 +392,10 @@ function FoodDialogBody({ isOpen, onClose, patientId, defaultMealType, onSuccess
           mealType={mealType}
           logDate={when.date || todayIST()}
           consumedAt={resolveMeasuredAt(when.date, when.time).instant?.toISOString()}
-          onLogged={() => {
+          // Same rule as the meal box above: the photo dialog closes itself when everything is saved.
+          onLogged={({ complete }) => {
             onSuccess?.();
-            onClose();
+            if (complete) onClose();
           }}
         />
 

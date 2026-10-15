@@ -43,11 +43,20 @@ export async function ensureSession(db: Db, userId: string, patientId: string, s
   return data.id as string;
 }
 
+/**
+ * One turn is cut at load. The app itself writes at most 1,000 characters of a question and 1,800 of an answer,
+ * but a row can also be written through the data gateway: an uncapped turn would be redacted and scanned in full
+ * on every question that follows (the prompt uses the first 500 characters of a turn anyway).
+ */
+export const MAX_HISTORY_TURN_CHARS = 2_000;
+
 /** Last turns of this session, loaded from the DB (never from the client, which could forge assistant turns). */
 export async function loadHistory(db: Db, sessionId: string, limit = 6): Promise<HistoryTurn[]> {
   const { data, error } = await raw(db).from("soie_messages").select("role,content,created_at").eq("session_id", sessionId).order("created_at", { ascending: false }).limit(limit);
   if (error || !data) return [];
-  return (data as Array<{ role: "user" | "assistant"; content: string }>).reverse().map((m) => ({ role: m.role, text: m.content }));
+  return (data as Array<{ role: "user" | "assistant"; content: string | null }>)
+    .reverse()
+    .map((m) => ({ role: m.role, text: String(m.content ?? "").slice(0, MAX_HISTORY_TURN_CHARS) }));
 }
 
 export interface SavedTurn {

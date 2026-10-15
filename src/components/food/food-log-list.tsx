@@ -34,6 +34,7 @@ import {
   mealLabel,
   oilCalories,
 } from "@/components/food/food-math";
+import { scaleFoodLog } from "@/lib/food/scale-log";
 import { addDaysIST, todayIST } from "@/lib/health-rules";
 import { cn, getExactFoodEmoji } from "@/lib/utils";
 import { copyPreviousMeal, deleteFoodLog, updateFoodLog, type FoodLogEntry } from "@/services/patient-service";
@@ -81,25 +82,26 @@ function EditFoodModal({ item, onClose, onSaved }: { item: FoodLogEntry; onClose
     }
     setError(null);
 
-    // Scale the stored numbers by the change in quantity; the oil is swapped separately.
-    const ratio = next / item.quantity;
-    const base = (item.calories - (item.oil_calories || 0)) * ratio;
     // An oil value the picker does not know (older free-text rows) keeps its stored calories untouched.
     const knownOil = OIL_OPTIONS.some((o) => o.id === oil);
     const newOil = knownOil ? oilCalories(oil) : item.oil_calories || 0;
+    // Everything but the oil scales with the quantity: the macros, the grams and the sodium (an unknown sodium stays
+    // unknown). The oil's calories and its fat are swapped separately (src/lib/food/scale-log.ts).
+    const scaled = scaleFoodLog(item, next, newOil);
 
     setSaving(true);
     try {
       await updateFoodLog(item.id, {
-        quantity: next,
+        quantity: scaled.quantity,
         oil_quantity: oil,
         oil_calories: newOil,
-        calories: Math.round(base + newOil),
-        standardized_grams: item.standardized_grams ? Math.round(item.standardized_grams * ratio) : item.standardized_grams,
-        protein_g: Math.round((item.protein_g || 0) * ratio),
-        carbs_g: Math.round((item.carbs_g || 0) * ratio),
-        fat_g: Math.round((item.fat_g || 0) * ratio),
-        fibre_g: Math.round((item.fibre_g || 0) * ratio),
+        calories: scaled.calories,
+        standardized_grams: scaled.standardized_grams,
+        protein_g: scaled.protein_g,
+        carbs_g: scaled.carbs_g,
+        fat_g: scaled.fat_g,
+        fibre_g: scaled.fibre_g,
+        sodium_mg: scaled.sodium_mg,
         calorie_confidence: oil === "Unknown" ? "Low" : item.calorie_confidence,
         notes: oil === "Unknown" ? UNKNOWN_OIL_NOTE : item.notes === UNKNOWN_OIL_NOTE ? null : item.notes,
       });
@@ -148,7 +150,7 @@ function EditFoodModal({ item, onClose, onSaved }: { item: FoodLogEntry; onClose
           </Select>
         </Field>
         <p lang="hi" className="text-xs text-ink-subtle">
-          मात्रा बदलने पर कैलोरी और प्रोटीन उसी अनुपात में बदलते हैं।
+          मात्रा बदलने पर कैलोरी, पोषक तत्व और सोडियम उसी अनुपात में बदलते हैं।
         </p>
       </div>
     </Modal>

@@ -23,8 +23,8 @@ import type {
 export const NOTICES: Record<Notice["code"], Omit<Notice, "code">> = {
   no_api_key: {
     tone: "info",
-    hi: "AI अभी चालू नहीं है (सर्वर पर API कुंजी सेट नहीं है), इसलिए यह जवाब नियम-आधारित इंजन से आया है: सिर्फ़ आपके दर्ज आँकड़ों से, बिना इंटरनेट खोज के।",
-    en: "The AI is not enabled (no API key on the server), so this answer comes from the rule-based engine: your logged data only, no internet search.",
+    hi: "AI अभी इस ऐप में चालू नहीं है, इसलिए यह जवाब नियम-आधारित इंजन से आया है: सिर्फ़ आपके दर्ज आँकड़ों से, बिना इंटरनेट खोज के।",
+    en: "AI is not switched on in this app, so this answer comes from the rule-based engine: your logged data only, no internet search.",
   },
   ai_unavailable: {
     tone: "attention",
@@ -50,6 +50,21 @@ export const NOTICES: Record<Notice["code"], Omit<Notice, "code">> = {
     tone: "info",
     hi: "इंटरनेट खोज बंद है; जवाब आपके डेटा और सामान्य जानकारी पर आधारित है।",
     en: "Internet search is off; the answer relies on your data and general knowledge.",
+  },
+  ai_consent_unasked: {
+    tone: "info",
+    hi: "AI से जवाब पाने के लिए पहले आपकी अनुमति चाहिए (आपके सवाल और बिना-नाम के आँकड़े AI सेवा को भेजे जाते हैं)। अभी यह जवाब नियम-आधारित इंजन से आया है: सिर्फ़ आपके दर्ज आँकड़ों से।",
+    en: "AI answers need your permission first (your question and de-identified figures are sent to an AI service). For now this is the rule-based answer, from your logged data only.",
+  },
+  ai_consent_off: {
+    tone: "info",
+    hi: "इस परिवार के लिए AI सहायता बंद है, इसलिए यह जवाब नियम-आधारित इंजन से आया है। चाहें तो सेटिंग्स में AI चालू कर सकते हैं।",
+    en: "AI help is switched off for this family, so this is the rule-based answer. You can switch it on in Settings.",
+  },
+  ai_quota: {
+    tone: "info",
+    hi: "आज के लिए AI का कोटा पूरा हो गया है, इसलिए यह जवाब नियम-आधारित इंजन से आया है। थोड़ी देर बाद या कल फिर कोशिश करें।",
+    en: "Today's AI allowance is used up, so this is the rule-based answer. Try again a little later or tomorrow.",
   },
   sparse_data: {
     tone: "info",

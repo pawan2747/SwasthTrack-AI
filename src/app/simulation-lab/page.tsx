@@ -7,33 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState, PageBody, PageHeader, Section } from "@/components/ui/page";
 import { useAuth } from "@/context/auth-context";
-import { authFetch } from "@/lib/db/auth-fetch";
 import type { EvalReport } from "@/services/soie/eval/harness";
-
-interface ServerInfo {
-  ai: boolean;
-  webSearch: boolean;
-  model: string | null;
-  rateLimitPerHour: number;
-}
+import { AiDiagnostics } from "./_components/ai-diagnostics";
 
 /**
- * SOIE evaluation & diagnostics (admin only).
+ * AI diagnostics and SOIE evaluation (admin only).
  *
  * "Run the evaluation" executes REAL engine code in this browser: the safety
  * gate, date resolver, fact ledger, answer verifier, rules engine, agent loop
  * (driven by a scripted fake model) and data loaders (against an in-memory fake
  * database), over synthetic patients. Pass/fail is computed, never canned.
  *
- * It does not call a real model or database. The server status below only says
- * whether a key is configured; it does not call the model either.
+ * It does not call a real model or database. The AI block below reads the
+ * server's configuration, health and usage (GET /api/ai/status); only its
+ * "Check now" button spends a few requests, on a fixed one-word prompt.
  */
 export default function SimulationLabPage() {
   const { profile, loading } = useAuth();
   const [report, setReport] = useState<EvalReport | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<[number, number]>([0, 0]);
-  const [server, setServer] = useState<ServerInfo | null | "error">(null);
   const [showAll, setShowAll] = useState(false);
 
   if (loading) {
@@ -48,7 +41,12 @@ export default function SimulationLabPage() {
   if (profile?.role !== "admin") {
     return (
       <PageBody>
-        <EmptyState icon={FlaskConical} title="Admins only" hindiTitle="यह पेज सिर्फ़ एडमिन के लिए है" description="SOIE की जाँच और डायग्नोस्टिक्स केवल एडमिन खाते दिखा सकते हैं।" />
+        <EmptyState
+          icon={FlaskConical}
+          title="Admins only"
+          hindiTitle="यह पेज सिर्फ़ एडमिन के लिए है"
+          description="AI और SOIE की जाँच केवल एडमिन खाते देख सकते हैं। एडमिन बनाने के लिए सर्वर पर: node scripts/db/link-patient.mjs --email <पता> --make-admin"
+        />
       </PageBody>
     );
   }
@@ -66,39 +64,35 @@ export default function SimulationLabPage() {
     }
   }
 
-  async function checkServer() {
-    setServer(null);
-    try {
-      const res = await authFetch("/api/soie");
-      setServer(res.ok ? ((await res.json()) as ServerInfo) : "error");
-    } catch {
-      setServer("error");
-    }
-  }
-
   const failing = report?.results.filter((r) => !r.passed) ?? [];
 
   return (
     <PageBody>
-      <PageHeader eyebrow="Admin" title="SOIE evaluation & diagnostics" hindiTitle="SOIE की जाँच" description="असली इंजन कोड पर चलने वाले टेस्ट। नतीजे गणना से आते हैं, पहले से तय नहीं।" />
+      <PageHeader eyebrow="Admin" title="AI diagnostics & SOIE evaluation" hindiTitle="AI की स्थिति और SOIE की जाँच" description="AI सेवाओं की स्थिति, और असली इंजन कोड पर चलने वाले टेस्ट। नतीजे गणना से आते हैं, पहले से तय नहीं।" />
 
-      <Card className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" onClick={run} disabled={running}>
-            {running ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Play aria-hidden className="h-4 w-4" />}
-            {running ? `चल रहा है… ${progress[0]}/${progress[1]}` : "मूल्यांकन चलाएँ (Run evaluation)"}
-          </Button>
-          {report ? (
-            <Badge variant={report.failed === 0 ? "positive" : "critical"}>
-              {report.failed === 0 ? <CheckCircle2 aria-hidden className="h-3 w-3" /> : <XCircle aria-hidden className="h-3 w-3" />}
-              {report.passed}/{report.total} पास · {report.ms} ms
-            </Badge>
-          ) : null}
-        </div>
-        <p className="text-xs text-ink-subtle">
-          चलता है: सुरक्षा गेट, तारीख़ समझ (IST), फ़ैक्ट लेजर, उत्तर-जाँचकर्ता (verifier), नियम-आधारित इंजन, एजेंट लूप (नकली स्क्रिप्टेड मॉडल के साथ) और डेटा-लोडर (नकली मेमोरी डेटाबेस के साथ), कृत्रिम मरीज़ों पर। असली AI मॉडल या असली डेटाबेस इसमें नहीं बुलाए जाते।
-        </p>
-      </Card>
+      <Section title="AI services" hindiTitle="AI सेवाएँ: कुंजी, मॉडल, रुकावट, इस्तेमाल">
+        <AiDiagnostics />
+      </Section>
+
+      <Section title="SOIE evaluation" hindiTitle="Ask (SOIE) की जाँच">
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="primary" onClick={run} disabled={running}>
+              {running ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Play aria-hidden className="h-4 w-4" />}
+              {running ? `चल रहा है… ${progress[0]}/${progress[1]}` : "मूल्यांकन चलाएँ (Run evaluation)"}
+            </Button>
+            {report ? (
+              <Badge variant={report.failed === 0 ? "positive" : "critical"}>
+                {report.failed === 0 ? <CheckCircle2 aria-hidden className="h-3 w-3" /> : <XCircle aria-hidden className="h-3 w-3" />}
+                {report.passed}/{report.total} पास · {report.ms} ms
+              </Badge>
+            ) : null}
+          </div>
+          <p className="text-xs text-ink-subtle">
+            चलता है: सुरक्षा गेट, तारीख़ समझ (IST), फ़ैक्ट लेजर, उत्तर-जाँचकर्ता (verifier), नियम-आधारित इंजन, एजेंट लूप (नकली स्क्रिप्टेड मॉडल के साथ) और डेटा-लोडर (नकली मेमोरी डेटाबेस के साथ), कृत्रिम मरीज़ों पर। असली AI मॉडल या असली डेटाबेस इसमें नहीं बुलाए जाते।
+          </p>
+        </Card>
+      </Section>
 
       {report ? (
         <>
@@ -172,26 +166,6 @@ export default function SimulationLabPage() {
           </Section>
         </>
       ) : null}
-
-      <Section title="Server configuration" hindiTitle="सर्वर की स्थिति">
-        <Card className="space-y-2 text-sm">
-          <Button variant="secondary" onClick={checkServer}>
-            जाँचें
-          </Button>
-          {server === "error" ? <p className="text-critical">स्थिति नहीं मिल सकी।</p> : null}
-          {server && server !== "error" ? (
-            <ul className="space-y-1 text-ink-muted">
-              <li>
-                AI कुंजी: <strong className={server.ai ? "text-positive" : "text-attention"}>{server.ai ? "सेट है" : "सेट नहीं है (नियम-आधारित मोड)"}</strong>
-              </li>
-              <li>मॉडल: {server.model ?? "—"}</li>
-              <li>इंटरनेट खोज: {server.webSearch ? "चालू" : "बंद"}</li>
-              <li>सीमा: {server.rateLimitPerHour} सवाल प्रति घंटा प्रति उपयोगकर्ता</li>
-            </ul>
-          ) : null}
-          <p className="text-xs text-ink-subtle">यह सिर्फ़ कॉन्फ़िगरेशन बताता है; असली मॉडल को कॉल नहीं करता। असली जाँच के लिए /ask पर एक सवाल पूछें (docs/soie.md में स्मोक-टेस्ट देखें)।</p>
-        </Card>
-      </Section>
     </PageBody>
   );
 }

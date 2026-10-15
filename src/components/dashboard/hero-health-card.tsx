@@ -19,7 +19,9 @@ import { Sparkline } from "@/components/ui/sparkline";
 import { Button } from "@/components/ui/button";
 import { Pressable, Reveal, Stagger } from "@/components/motion/primitives";
 import { Card, metricChipClasses, type MetricTone } from "@/components/ui/card";
+import { AiBriefBlock } from "@/components/dashboard/ai-brief-block";
 import { bpTextClass } from "@/components/dashboard/bp-status";
+import type { BriefResponse } from "@/lib/analytics/brief-calc";
 import {
   DEFAULT_BP_THRESHOLDS,
   IST_TZ,
@@ -50,6 +52,13 @@ type HeroHealthCardProps = {
   onOpenActivity?: () => void;
   onOpenMedicine?: () => void;
   onOpenSleep?: () => void;
+  /**
+   * The verified AI daily update for today. Absent, unavailable or not ready (AI off or unasked, an urgent
+   * day, no data yet): the card is exactly what it was before AI existed.
+   */
+  brief?: BriefResponse | null;
+  /** A save just happened and the update is being refreshed. */
+  briefStale?: boolean;
 };
 
 const dateLabelFmt = new Intl.DateTimeFormat("hi-IN", {
@@ -282,6 +291,8 @@ export function HeroHealthCard({
   onOpenActivity,
   onOpenMedicine,
   onOpenSleep,
+  brief = null,
+  briefStale = false,
 }: HeroHealthCardProps) {
   const {
     patient,
@@ -323,6 +334,8 @@ export function HeroHealthCard({
 
   const firstName = patient.name.trim().split(/\s+/)[0] || patient.name;
   const canLog = Boolean(onOpenBP || onOpenWeight || onOpenFood || onOpenActivity || onOpenSleep);
+  // The papa voice only: on an "important" day the update speaks to the family, and this card keeps its own text.
+  const aiBrief = brief?.status === "ready" && brief.papa !== null ? brief : null;
   const scoreReady = wellness.status === "ready" && wellness.result.isSufficient;
 
   return (
@@ -365,18 +378,41 @@ export function HeroHealthCard({
           )}
         </div>
 
-        <blockquote
-          lang="hi"
-          className="tile flex gap-2.5 rounded-card px-3.5 py-3 sm:col-start-1 sm:row-start-2 sm:self-start"
-        >
-          <Quote aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-gold-ink" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium leading-relaxed text-ink">{dailyMessage.text}</p>
-            {dailyMessage.subtext ? (
-              <footer className="mt-1 hidden text-xs text-ink-muted sm:block">{dailyMessage.subtext}</footer>
-            ) : null}
+        {aiBrief ? (
+          <div className="tile rounded-card px-3.5 py-3 sm:col-start-1 sm:row-start-2 sm:self-start">
+            <AiBriefBlock
+              brief={aiBrief}
+              audience="papa"
+              stale={briefStale}
+              onOpen={{
+                bp: onOpenBP,
+                medicine: onOpenMedicine,
+                food: onOpenFood,
+                sleep: onOpenSleep,
+                activity: onOpenActivity,
+                weight: onOpenWeight,
+              }}
+            />
+            {/* The family's own message stays: it is theirs, and it is the whole tile when AI is off. */}
+            <p lang="hi" className="mt-3 flex gap-2 border-t border-gold-line pt-2.5 text-xs leading-relaxed text-ink-muted">
+              <Quote aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-ink" />
+              <span>{dailyMessage.text}</span>
+            </p>
           </div>
-        </blockquote>
+        ) : (
+          <blockquote
+            lang="hi"
+            className="tile flex gap-2.5 rounded-card px-3.5 py-3 sm:col-start-1 sm:row-start-2 sm:self-start"
+          >
+            <Quote aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-gold-ink" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium leading-relaxed text-ink">{dailyMessage.text}</p>
+              {dailyMessage.subtext ? (
+                <footer className="mt-1 hidden text-xs text-ink-muted sm:block">{dailyMessage.subtext}</footer>
+              ) : null}
+            </div>
+          </blockquote>
+        )}
       </div>
 
       {/* ---- six-vital snapshot (§25) ---- */}

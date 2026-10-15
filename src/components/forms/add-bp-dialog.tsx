@@ -254,6 +254,7 @@ function BPEntry({ patientId, presentation, onDone, onSuccess, thresholds: thres
       ) : null}
       <DisplayPhotoDialog
         kind="bp"
+        patientId={patientId}
         isOpen={photoOpen}
         onClose={() => setPhotoOpen(false)}
         onResult={(v) => {

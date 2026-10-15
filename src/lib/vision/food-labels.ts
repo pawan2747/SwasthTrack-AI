@@ -137,7 +137,14 @@ const SYNONYMS: Record<string, string> = {
 /** Words in a label that say how something is cooked or presented rather than what it is. */
 const STRIP = /\b(fried|grilled|roasted|baked|steamed|boiled|stuffed|spicy|sweet|sour|hot|cold|homemade|style|dish|plate|bowl|cup|of|with|and|the|a)\b/g;
 
-/** The catalogue search queries to try for one classifier label, most specific first. */
+/**
+ * The catalogue search queries to try for one classifier label, most specific first.
+ *
+ * The last query is the label's head noun ("curry" from "mixed vegetable curry"): the loosest one, which finds Curry
+ * Leaves above the dish. The classifier path takes it as it is (its hits are chips). The AI plate reader
+ * (src/lib/vision/meal-map.ts, mealQueriesFor) treats every single word derived from a longer name as a FALLBACK,
+ * tried only when nothing else scored 560, and never pre-selects a food it found that way.
+ */
 export function cataloguieQueriesFor(label: string): string[] {
   const clean = label.trim().toLowerCase();
   const mapped = SYNONYMS[clean];

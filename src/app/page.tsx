@@ -16,6 +16,8 @@ import {
   WeightCard,
 } from "@/components/dashboard/dashboard-sections";
 import { PatientOverviewCard } from "@/components/dashboard/patient-overview-card";
+import { AiBriefConsentPrompt, fetchAiBrief } from "@/components/dashboard/ai-brief-block";
+import { briefSurface, type BriefResponse } from "@/lib/analytics/brief-calc";
 import { HeroHealthCard, type WellnessView } from "@/components/dashboard/hero-health-card";
 import { DailyStoryCard } from "@/components/dashboard/daily-story-card";
 import { WhatChangedCard } from "@/components/dashboard/what-changed-card";
@@ -48,8 +50,9 @@ import {
   type BPLogEntry,
   type DashboardOverview,
 } from "@/services/patient-service";
-import { DEFAULT_BP_THRESHOLDS, todayIST, type BPThresholds } from "@/lib/health-rules";
+import { DEFAULT_BP_THRESHOLDS, dayPartIST, todayIST, type BPThresholds } from "@/lib/health-rules";
 import { useAuth } from "@/context/auth-context";
+import { useAiSettings } from "@/hooks/use-ai-settings";
 import { cn } from "@/lib/utils";
 
 type DialogName = "bp" | "weight" | "food" | "activity" | "sleep" | "medicine" | "profile";
@@ -66,6 +69,12 @@ type OverviewResult =
 
 /** Analytics are slower than the overview; after a save they refresh once things settle. */
 const ANALYTICS_DEBOUNCE_MS = 1500;
+
+/**
+ * The AI daily update may cost a model call when the day's story changed, so it waits longer than the
+ * analytics after a save: several entries in a row (BP, then the medicines, then a meal) become one request.
+ */
+const BRIEF_DEBOUNCE_MS = 8000;
 
 function keepOrFail<T>(prev: Slice<T>): Slice<T> {
   return prev.status === "ready" ? prev : { status: "error" };
@@ -108,6 +117,14 @@ export default function DashboardPage() {
   const [forecast, setForecast] = useState<Slice<Forecast>>(LOADING);
   const [wellness, setWellness] = useState<WellnessView>(LOADING);
 
+  // The AI daily update: asked of the server only once the family has said yes to text AI.
+  const ai = useAiSettings(activePatientId);
+  const [brief, setBrief] = useState<{ patientId: string; response: BriefResponse } | null>(null);
+  /** A save just happened and the update is being refreshed: it is shown quieter until the new one lands. */
+  const [briefStale, setBriefStale] = useState(false);
+  const briefTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const briefRun = useRef(0);
+
   const [dialog, setDialog] = useState<DialogName | null>(null);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
 
@@ -121,6 +138,7 @@ export default function DashboardPage() {
   useEffect(
     () => () => {
       if (analyticsTimer.current) clearTimeout(analyticsTimer.current);
+      if (briefTimer.current) clearTimeout(briefTimer.current);
     },
     [],
   );
@@ -148,6 +166,16 @@ export default function DashboardPage() {
     },
     [loadWellness],
   );
+
+  /** The AI daily update. Any failure or refusal is "no update": the card keeps its own message. */
+  const loadBrief = useCallback((patientId: string) => {
+    const run = ++briefRun.current;
+    void fetchAiBrief(patientId, "today").then((response) => {
+      if (run !== briefRun.current) return; // a newer request has started
+      setBrief({ patientId, response });
+      setBriefStale(false);
+    });
+  }, []);
 
   /**
    * Core screen first. This only fetches; `applyOverview` sets state, so the mount effect
@@ -214,6 +242,24 @@ export default function DashboardPage() {
     };
   }, [activePatientId, fetchOverview, applyOverview, loadAnalytics]);
 
+  // Once the overview is on screen and text AI is on: the daily update. It runs again on a new IST day
+  // (loadedDay), when the part of the day changes (the minute tick re-renders; the wording is per part of the
+  // day) and when the family switches text AI on (briefEnabled), but not on every save (afterSave).
+  const briefPatientId = data?.patient.id ?? null;
+  const briefEnabled = ai.available && ai.textOn;
+  const briefPart = dayPartIST(new Date());
+  useEffect(() => {
+    if (briefPatientId && briefEnabled) loadBrief(briefPatientId);
+    // A save-debounce still pending for another patient (or after text AI went off) must not fire later:
+    // it would start a request that makes this patient's answer look outdated.
+    return () => {
+      if (briefTimer.current) {
+        clearTimeout(briefTimer.current);
+        briefTimer.current = null;
+      }
+    };
+  }, [briefPatientId, briefEnabled, loadedDay, briefPart, loadBrief]);
+
   /**
    * A phone leaves the app open overnight. Once the IST date rolls over, "today" on screen
    * would still be yesterday's records, so on the next tick (or when the tab becomes visible
@@ -248,7 +294,14 @@ export default function DashboardPage() {
     analyticsTimer.current = setTimeout(() => {
       if (activePatientId) loadAnalytics(activePatientId);
     }, ANALYTICS_DEBOUNCE_MS);
-  }, [activePatientId, applyOverview, fetchOverview, loadAnalytics]);
+    if (briefEnabled) {
+      setBriefStale(true);
+      if (briefTimer.current) clearTimeout(briefTimer.current);
+      briefTimer.current = setTimeout(() => {
+        if (activePatientId) loadBrief(activePatientId);
+      }, BRIEF_DEBOUNCE_MS);
+    }
+  }, [activePatientId, applyOverview, briefEnabled, fetchOverview, loadAnalytics, loadBrief]);
 
   /**
    * The calorie target lives in two places: the patient profile (edited here) and the
@@ -350,6 +403,12 @@ export default function DashboardPage() {
   const analyticsLoading = [smart, intel, forecast].some((s) => s.status === "loading");
   const hasAlerts = smart.status === "ready" && smart.data.alerts.length > 0;
 
+  // The update belongs to the patient it was asked for; a refusal clears whatever was shown before, and it
+  // is shown only while text AI is on.
+  const activeBrief = briefEnabled && brief && brief.patientId === data.patient.id ? brief.response : null;
+  // One small question while text AI was never asked about. Not next to an alert: attention goes there first.
+  const showBriefPrompt = briefSurface(activeBrief, { textOn: ai.textOn, textUnasked: ai.textUnasked, canChange: ai.canChange }, "papa") === "consent_prompt" && !hasAlerts;
+
   // What "दर्ज करें" does in the tracking summary: open the form here, for every vital.
   const summaryActions = canWrite
     ? {
@@ -379,7 +438,12 @@ export default function DashboardPage() {
         onOpenActivity={canWrite ? open("activity") : undefined}
         onOpenMedicine={open("medicine")}
         onOpenSleep={canWrite ? open("sleep") : undefined}
+        brief={activeBrief}
+        briefStale={briefStale}
       />
+
+      {/* One small question, only while text AI was never asked about; it opens the consent dialog on tap. */}
+      {showBriefPrompt ? <AiBriefConsentPrompt key={data.patient.id} patientId={data.patient.id} /> : null}
 
       <div className="flex flex-col gap-5 sm:gap-6 lg:grid lg:grid-cols-2 lg:items-start xl:grid-cols-12">
         {/* Left column from `lg`: log and track */}
@@ -394,6 +458,7 @@ export default function DashboardPage() {
                 onOpenActivity={open("activity")}
                 onOpenSleep={open("sleep")}
                 onOpenMedicine={open("medicine")}
+                onVoiceSaved={afterSave}
               />
             </Slot>
           ) : null}

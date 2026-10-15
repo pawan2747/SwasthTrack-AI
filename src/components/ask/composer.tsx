@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VoiceInput } from "@/components/ask/voice-input";
@@ -22,6 +22,7 @@ export function Composer({
   onCancel,
   maxLength = 1000,
   patientFirstName,
+  above,
   className,
 }: {
   disabled?: boolean;
@@ -31,6 +32,8 @@ export function Composer({
   maxLength?: number;
   /** Used only to make the example in the placeholder about the right person. */
   patientFirstName?: string;
+  /** Pinned directly above the input, inside the sticky panel (the emergency card). */
+  above?: ReactNode;
   className?: string;
 }) {
   const [text, setText] = useState("");
@@ -73,6 +76,7 @@ export function Composer({
         className,
       )}
     >
+      {above}
       <form
         onSubmit={submit}
         className={cn(

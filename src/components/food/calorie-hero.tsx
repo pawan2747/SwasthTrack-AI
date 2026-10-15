@@ -5,6 +5,7 @@ import { AlertTriangle, Flame, Utensils } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { DayStepper } from "@/components/food/day-stepper";
+import { SodiumPanel } from "@/components/food/sodium-panel";
 import { macroSplit, sumFoodLogs } from "@/lib/analytics/food-calc";
 import { todayIST } from "@/lib/health-rules";
 import type { FoodLogEntry } from "@/services/patient-service";
@@ -219,6 +220,9 @@ export function CalorieHero({ date, onDateChange, logs, loading, error = false, 
           {error ? null : <MacroBreakdown protein={totals.protein} carbs={totals.carbs} fat={totals.fat} fibre={totals.fibre} />}
         </div>
       )}
+
+      {/* Only when at least one logged item carries sodium data; neutral framing, never red (see sodium-panel.tsx). */}
+      {loading || error ? null : <SodiumPanel logs={items} totals={totals} />}
     </Card>
   );
 }

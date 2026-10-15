@@ -44,10 +44,26 @@ export default function MedicalDisclaimerPage() {
           </LegalList>
         </LegalSection>
 
-        <LegalSection title="3. Estimates, trends and AI answers">
+        <LegalSection title="3. Estimates, trends, photo readings and AI notes">
           <p>
-            Trends, flags, calorie figures and Ask answers (including AI-written ones, when enabled) are estimates built from what was
-            logged. They can be incomplete or wrong and are not clinical assessments. Where a number is an estimate, the app says so.
+            Trends, flags, calorie figures, summaries and Ask answers (including AI-written notes, when AI is switched on) are estimates
+            built from what was logged. They can be incomplete or wrong and are not clinical assessments. Where a number is an estimate,
+            the app says so.
+          </p>
+          <LegalList>
+            <li>
+              A number read from a photo of a monitor or scale, or a dish suggested from a meal photo, is a suggestion. Check it against
+              the device&apos;s own display before you save it.
+            </li>
+            <li>
+              The AI has not examined the patient and is not given the full history. It never starts, stops or changes a medicine, a dose,
+              a schedule or a target: a person does that, on the doctor&apos;s advice.
+            </li>
+            <li>An AI note never means that a doctor is not needed.</li>
+          </LegalList>
+          <p lang="hi" className="rounded-card border border-line bg-surface-sunken p-3 text-ink-muted">
+            AI कभी दवा, खुराक या इलाज तय नहीं करता। फोटो से पढ़ा अंक सेव करने से पहले मशीन की स्क्रीन से मिलाएँ। AI का लिखा नोट डॉक्टर की
+            सलाह की जगह नहीं लेता।
           </p>
         </LegalSection>
 

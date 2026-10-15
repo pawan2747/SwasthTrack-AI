@@ -85,7 +85,7 @@ export function MemoriesManager({ isOpen, onClose, patientId, canWrite }: { isOp
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="सेव की गई बातें" hindiTitle="Saved notes" description="आपके फीडबैक और सेव की गई बातें अगले जवाबों में इस्तेमाल होती हैं। (AI चालू होने पर; नियम-आधारित जवाब इन्हें नहीं पढ़ते।)" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="सेव की गई बातें" hindiTitle="Saved notes" description="सेव की गई बातें तब काम आती हैं जब आप उनके बारे में पूछें (जैसे “दूध से एलर्जी है क्या?”): नियम-आधारित जवाब भी इन्हें पढ़ते हैं। AI चालू हो तो ये बातें (मरीज़ या परिवार का नाम हटाकर) AI सेवा को भी भेजी जा सकती हैं।" size="md">
       <div className="space-y-4">
         {canWrite ? (
           <div className="space-y-3 rounded-card border border-gold-line bg-gold-soft p-3.5">
@@ -101,7 +101,7 @@ export function MemoriesManager({ isOpen, onClose, patientId, canWrite }: { isOp
                 options={MEMORY_KINDS.map((k) => ({ value: k, label: KIND_HI[k] }))}
               />
             </div>
-            <Field label="बात लिखें" hint={`${content.length}/${MAX_MEMORY_CHARS} · जैसे: दूध से एलर्जी है / रात के खाने के बाद टहलते हैं`}>
+            <Field label="बात लिखें" hint={`${content.length}/${MAX_MEMORY_CHARS} · जैसे: दूध से एलर्जी है / रात के खाने के बाद टहलते हैं · नाम या फ़ोन नंबर न लिखें`}>
               <TextArea value={content} maxLength={MAX_MEMORY_CHARS} onChange={(e) => setContent(e.target.value)} />
             </Field>
             <Button variant="primary" onClick={add} loading={busy} disabled={content.trim().length === 0}>

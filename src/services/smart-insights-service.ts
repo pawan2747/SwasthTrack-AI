@@ -7,6 +7,8 @@ import {
   todayIST,
 } from "@/lib/health-rules";
 import { buildDoseRecords, overduePendingDoses, summarizeAdherence } from "@/lib/analytics/adherence";
+import { coveredByMedicinePattern } from "@/lib/analytics/medicine-patterns-calc";
+import { NUDGES } from "@/lib/medicine-format";
 import { readLocalPref, writeLocalPref } from "@/lib/utils";
 import { bpDay, foodDay, loadSeries, weightDay } from "./analytics-data";
 import { detectHealthAnomaliesAndTrends } from "./anomaly-detection-service";
@@ -276,15 +278,24 @@ export async function generateSmartInsightsAndAlerts(patientId: string): Promise
       });
     }
     const missedToday = doses.filter((d) => d.status === "missed");
-    if (missedToday.length > 0 && !(intelligence?.anomalies ?? []).some((a) => a.rule === "missed_dose_cluster")) {
+    // Not shown next to an anomaly that already names these medicines (the cluster rule, or a class-aware pattern).
+    if (missedToday.length > 0 && !coveredByMedicinePattern([...new Set(missedToday.map((d) => d.medicineId))], intelligence?.anomalies ?? [])) {
+      // "Missed" for doses somebody marked; a dose nobody wrote down is "not recorded", never "not taken".
+      const none = missedToday.every((d) => !d.hasRealLog);
+      const all = missedToday.every((d) => d.hasRealLog);
+      const n = missedToday.length;
       push({
         key: `alert-med-missed-${today}`,
         category: "medicine",
         severity: "ATTENTION",
         title: "Missed dose today",
         titleHi: "आज एक दवाई छूट गई",
-        message: `${missedToday.length} dose(s) missed today. Do not double the next dose; ask the doctor or pharmacist if unsure.`,
-        messageHi: `आज ${missedToday.length} खुराक छूटी। अगली खुराक दोगुनी न करें; संदेह हो तो डॉक्टर/फार्मासिस्ट से पूछें।`,
+        message: `${n} dose(s) ${all ? "missed" : none ? "not recorded" : "missed or not recorded"} today. ${
+          none ? `${NUDGES.tick_if_taken.en} ` : ""
+        }Do not double the next dose; ask the doctor or pharmacist if unsure.`,
+        messageHi: `आज ${n} खुराक ${all ? "छूटी" : none ? "दर्ज नहीं हुई" : "छूटी या दर्ज नहीं हुई"}। ${
+          none ? `${NUDGES.tick_if_taken.hi} ` : ""
+        }अगली खुराक दोगुनी न करें; संदेह हो तो डॉक्टर/फार्मासिस्ट से पूछें।`,
       });
     }
   }

@@ -1,6 +1,7 @@
 import { bi, type Bi } from "../format";
 import {
   C,
+  alertCallout,
   chips,
   ctaSection,
   en,
@@ -94,6 +95,25 @@ export function renderBpAlertEmail(d: BpAlertData, opts: RenderOptions = {}): Re
   const base = opts.base === undefined ? appBase() : opts.base;
   const right = d.slot ? `${bi(slotLabel[d.slot])} · ${d.timeLabel}` : d.timeLabel;
 
+  // Rows under the advice. Neither is advice: they are counts from the records ("recorded as taken" is
+  // never the same as "taken": a dose nobody wrote down is simply not in the count).
+  const contextRows: { label: Bi; value: string }[] = [];
+  if (d.outOfRange7d >= 2) {
+    contextRows.push({
+      label: { hi: "पिछले 7 दिनों में दायरे से बाहर रीडिंग", en: "Readings outside the range in the last 7 days" },
+      value: val(String(d.outOfRange7d), { size: 16 }),
+    });
+  }
+  if (d.doseContext && d.doseContext.due > 0) {
+    contextRows.push({
+      label: {
+        hi: `बीपी की दवाई ली गई दर्ज (पिछले ${d.doseContext.days} दिन)`,
+        en: `BP medicine recorded as taken (last ${d.doseContext.days} days)`,
+      },
+      value: val(`${d.doseContext.adherent} / ${d.doseContext.due}`, { size: 16 }),
+    });
+  }
+
   const sections = [
     section(
       topBar(pill(m.pill, m.pillLabel), right) +
@@ -112,15 +132,7 @@ export function renderBpAlertEmail(d: BpAlertData, opts: RenderOptions = {}): Re
       heading({ hi: "अभी क्या करें", en: "What to do now" }) +
         hi(m.advice.hi, { size: 13, lh: 21 }) +
         en(m.advice.en, { size: 12, lh: 17, color: C.muted, mt: 3 }) +
-        (d.outOfRange7d >= 2
-          ? spacer(10) +
-            kvRows([
-              {
-                label: { hi: "पिछले 7 दिनों में दायरे से बाहर रीडिंग", en: "Readings outside the range in the last 7 days" },
-                value: val(String(d.outOfRange7d), { size: 16 }),
-              },
-            ])
-          : ""),
+        (contextRows.length > 0 ? spacer(10) + kvRows(contextRows) : ""),
     ),
     ctaSection(base, "/health", { hi: "हेल्थ खोलें", en: "Open Health" }, {
       hi: "ऐप में पूरा बीपी चार्ट और पिछली रीडिंग देखें।",
@@ -173,12 +185,17 @@ export function renderReminderEmail(d: ReminderData, opts: RenderOptions = {}): 
     );
   }
 
-  if (d.missedMedicines.length > 0) {
+  const yesterday = d.yesterdayMissed ?? [];
+  if (d.missedMedicines.length > 0 || yesterday.length > 0) {
     items++;
     sections.push(
       section(
         heading({ hi: "दवा छूट गई", en: "Medicine missed" }) +
-          listRows(d.missedMedicines.map((m) => ({ name: m.name, sub: m.sub, right: pill("attention", "टिक नहीं हुई · Not ticked", 10.5) }))) +
+          listRows([
+            ...d.missedMedicines.map((m) => ({ name: m.name, sub: m.sub, right: pill("attention", "टिक नहीं हुई · Not ticked", 10.5) })),
+            // Yesterday's doses carry their own tag: they are a day old, not part of today's list.
+            ...yesterday.map((m) => ({ name: m.name, sub: m.sub, right: pill("attention", "कल · Yesterday", 10.5) })),
+          ]) +
           hi("अगर दवा ले ली गई है, तो ऐप में टिक कर दें। छूटी खुराक के बारे में डॉक्टर से पूछें — खुद से खुराक न बदलें।", { size: 11.5, lh: 18, color: C.muted, mt: 8 }) +
           en("If it was taken, tick it in the app. For a missed dose, ask the doctor — please don't change the dose on your own.", { size: 11, lh: 15, color: C.muted, mt: 1 }),
       ),
@@ -192,12 +209,19 @@ export function renderReminderEmail(d: ReminderData, opts: RenderOptions = {}): 
     );
   }
 
+  if (d.medicineInsight) {
+    items++;
+    sections.push(section(alertCallout(d.medicineInsight), { pad: "14px 22px 12px" }));
+  }
+
   sections.push(ctaSection(base, "/", { hi: "ऐप खोलें", en: "Open app" }));
 
+  // Subject and preheader stay code-only (a count), whatever a model wrote in the body.
   return finish({
     subject: `SwasthTrack reminder · ${d.patientName} · ${items} item${items === 1 ? "" : "s"} need attention`,
     title: `SwasthTrack · Reminder · ${d.patientName}`,
     preheader: "आज कुछ चीज़ें बाकी हैं · A few things are still pending today",
+    aiNote: d.aiAssisted === true,
     sections,
     reason: {
       hi: `आपको यह रिमाइंडर इसलिए मिला क्योंकि आप ${d.patientName} की देखभाल से जुड़े हैं। यह दिन में एक ही बार, कुछ छूटने पर ही आता है।`,

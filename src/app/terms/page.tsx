@@ -1,7 +1,7 @@
 import { FileText, Mail, ShieldAlert } from "lucide-react";
 import { ContactCard, LegalBody, LegalList, LegalPage, LegalSection } from "@/components/legal/legal-page";
 
-const LAST_UPDATED = "October 2026";
+const LAST_UPDATED = "15 October 2026";
 
 export default function TermsOfUsePage() {
   return (
@@ -50,6 +50,11 @@ export default function TermsOfUsePage() {
             When you join a patient with an invite code you confirm that the patient, or their legal guardian, has agreed that you may
             see their records for supportive care. The owner can change or remove access at any time.
           </p>
+          <p>
+            Before an owner or editor switches AI on, scans a photo or records a voice clip, they confirm that the patient (or their
+            guardian) agrees that this content may be sent to the outside AI services described in the Privacy Policy. Do not scan photos
+            that show a person&apos;s face, or a name, address or phone number.
+          </p>
         </LegalSection>
 
         <LegalSection title="5. No medical advice">
@@ -57,6 +62,11 @@ export default function TermsOfUsePage() {
             Scores, trends, estimates, alerts and Ask answers (including any AI-written answers) are for information only. They can be
             incomplete or wrong, and they never replace a doctor. Speak to your physician before changing any medicine or routine. In an
             emergency call 112 / 108.
+          </p>
+          <p>
+            AI features depend on outside services that can be slow, wrong or unavailable, and that may change or stop without notice.
+            When one is unavailable the app uses its own rules and keeps working. A number read from a photo is only a suggestion until
+            you have checked it against the device and saved it.
           </p>
         </LegalSection>
 

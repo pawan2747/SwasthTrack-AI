@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo-mark";
 import { useRouter } from "next/navigation";
 import {
@@ -21,9 +22,19 @@ import { cn } from "@/lib/utils";
 import { Field, NumberInput, Select, TextInput } from "@/components/ui/form-field";
 import { JoinPatientDialog } from "@/components/forms/join-patient-dialog";
 import { useAuth } from "@/context/auth-context";
+import { authFetch } from "@/lib/db/auth-fetch";
+import { AI_NEVER_SENDS, AI_PROVIDERS } from "@/lib/ai-disclosure";
+import { ONBOARDING_AI_COPY, choiceToPatch, type AiChoice } from "@/lib/ai-panel-view";
+import { saveAiSettings } from "@/services/ai-settings-service";
 import { createPatientForCurrentUser } from "@/services/auth-service";
 import { sendAppEmailQuietly } from "@/services/email-client";
 import { addMedicalCondition } from "@/services/patient-service";
+
+const AI_CHOICES: Array<{ value: AiChoice; hi: string; en: string }> = [
+  { value: "later", hi: ONBOARDING_AI_COPY.laterHi, en: ONBOARDING_AI_COPY.laterEn },
+  { value: "on", hi: ONBOARDING_AI_COPY.onHi, en: ONBOARDING_AI_COPY.onEn },
+  { value: "off", hi: ONBOARDING_AI_COPY.offHi, en: ONBOARDING_AI_COPY.offEn },
+];
 
 const CONDITION_PRESETS = [
   { name: "Hypertension", hi: "उच्च रक्तचाप" },
@@ -71,7 +82,28 @@ export default function OnboardingPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [createdWithGaps, setCreatedWithGaps] = useState(false);
+  const [conditionsGap, setConditionsGap] = useState(false);
+  const [aiGap, setAiGap] = useState(false);
+  // The AI step is offered only when this app has AI at all; "ask me later" is the default and writes nothing.
+  const [aiOffered, setAiOffered] = useState(false);
+  const [aiChoice, setAiChoice] = useState<AiChoice>("later");
   const busyRef = useRef(false);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await authFetch("/api/ai/status");
+        const j = res.ok ? ((await res.json()) as { available?: unknown }) : null;
+        if (alive && j?.available === true) setAiOffered(true);
+      } catch {
+        // No AI step: onboarding is exactly what it was.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /** Typing into a field that was flagged takes its error away; the summary goes when nothing is flagged any more. */
   function edit(key: keyof FieldErrors, set: (value: string) => void) {
@@ -137,20 +169,24 @@ export default function OnboardingPage() {
         daily_calorie_target: calR.value,
       });
 
-      // The patient exists now. Conditions are extras: a failure here must not hide that.
-      const results = await Promise.allSettled(
-        selectedConditions.map((condition) =>
-          addMedicalCondition({ patient_id: patient.id, condition_name: condition }),
-        ),
+      // The patient exists now. Conditions and the AI choice are extras: a failure here must not hide that.
+      const aiPatch = aiOffered ? choiceToPatch(aiChoice) : null;
+      const extras: Promise<unknown>[] = selectedConditions.map((condition) =>
+        addMedicalCondition({ patient_id: patient.id, condition_name: condition }),
       );
-      const gaps = results.some((r) => r.status === "rejected");
+      if (aiPatch) extras.push(saveAiSettings(patient.id, aiPatch));
+      const results = await Promise.allSettled(extras);
+      const gaps = results.slice(0, selectedConditions.length).some((r) => r.status === "rejected");
+      const aiFailed = aiPatch !== null && results[results.length - 1]?.status === "rejected";
 
       await refreshSession();
       setActivePatientId(patient.id);
       // Courtesy mail for the very first profile only; never blocks or fails onboarding.
       if (!hasPatients) sendAppEmailQuietly({ type: "account.welcome", patientId: patient.id });
 
-      if (gaps) {
+      if (gaps || aiFailed) {
+        setConditionsGap(gaps);
+        setAiGap(aiFailed);
         setCreatedWithGaps(true);
       } else {
         router.replace("/");
@@ -197,8 +233,20 @@ export default function OnboardingPage() {
 
       {createdWithGaps ? (
         <Card tone="premium" className="space-y-4 text-center">
-          <div className="rounded-card border border-attention-line bg-attention-soft p-4 text-sm text-attention">
-            <span lang="hi">मरीज़ की प्रोफाइल बन गई है, पर कुछ स्वास्थ्य स्थितियाँ सेव नहीं हो सकीं। उन्हें Profile पेज पर जोड़ लें।</span> (Profile created; some conditions were not saved: add them on the Profile page.)
+          <div className="space-y-2 rounded-card border border-attention-line bg-attention-soft p-4 text-sm text-attention">
+            <p>
+              <span lang="hi">मरीज़ की प्रोफाइल बन गई है।</span> (Profile created.)
+            </p>
+            {conditionsGap ? (
+              <p>
+                <span lang="hi">कुछ स्वास्थ्य स्थितियाँ सेव नहीं हो सकीं। उन्हें Profile पेज पर जोड़ लें।</span> (Some conditions were not saved: add them on the Profile page.)
+              </p>
+            ) : null}
+            {aiGap ? (
+              <p>
+                <span lang="hi">{ONBOARDING_AI_COPY.gapHi}</span> ({ONBOARDING_AI_COPY.gapEn})
+              </p>
+            ) : null}
           </div>
           <Button variant="primary" size="lg" block onClick={() => router.replace("/")}>
             आगे बढ़ें (Continue)
@@ -354,6 +402,57 @@ export default function OnboardingPage() {
             </div>
           </Card>
 
+          {aiOffered ? (
+            <Card className="space-y-3">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+                <span className="grid h-8 w-8 place-items-center rounded-control bg-brand-soft text-brand-ink">
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                </span>
+                <span lang="hi">{ONBOARDING_AI_COPY.titleHi}</span>{" "}
+                <span className="text-sm font-normal text-ink-muted">{ONBOARDING_AI_COPY.titleEn}</span>
+              </h2>
+              <p lang="hi" className="text-sm leading-relaxed text-ink-muted">
+                {ONBOARDING_AI_COPY.introHi}
+              </p>
+              <p className="text-xs leading-relaxed text-ink-muted">{ONBOARDING_AI_COPY.introEn}</p>
+              <div role="radiogroup" aria-label="AI सहायता की पसंद (AI help choice)" className="grid gap-2">
+                {AI_CHOICES.map((opt) => {
+                  const selected = aiChoice === opt.value;
+                  return (
+                    <label
+                      key={opt.value}
+                      className={cn(
+                        "flex min-h-control cursor-pointer items-center gap-3 rounded-card border p-3 transition-colors",
+                        "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand",
+                        selected ? "border-gold-line bg-gold-soft shadow-e1" : "tile hover:border-gold-line",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="aiChoice"
+                        checked={selected}
+                        onChange={() => setAiChoice(opt.value)}
+                        className="h-5 w-5 shrink-0 accent-brand"
+                      />
+                      <span className="min-w-0">
+                        <span lang="hi" className={cn("block text-sm", selected ? "font-semibold text-ink" : "font-medium text-ink")}>
+                          {opt.hi}
+                        </span>
+                        <span className="block text-xs text-ink-muted">{opt.en}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p lang="hi" className="text-xs leading-relaxed text-ink-muted">
+                {AI_NEVER_SENDS[0].hi} सेवाएँ बाहरी कंपनियाँ हैं (ऐप पर जो जुड़ी हों: {AI_PROVIDERS.map((p) => p.name).join(", ")}); मुफ़्त प्लान पर वे भेजी गई सामग्री को अपनी सेवा सुधारने में इस्तेमाल कर सकती हैं।{" "}
+                <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-ink underline underline-offset-2">
+                  पूरी जानकारी: गोपनीयता नीति
+                </Link>
+              </p>
+            </Card>
+          ) : null}
+
           <Button type="submit" variant="primary" size="lg" block loading={loading}>
             {loading ? null : <Sparkles className="h-4 w-4" aria-hidden />}
             <span lang="hi">{loading ? "प्रोफाइल बन रही है…" : "सेटअप पूरा करें"}</span>
@@ -387,6 +486,7 @@ export default function OnboardingPage() {
       <p lang="hi" className="mt-5 flex items-center justify-center gap-1.5 text-center text-xs text-ink-muted">
         <ShieldCheck aria-hidden className="h-3.5 w-3.5" />
         आपकी जानकारी सुरक्षित रहती है और सिर्फ़ उन्हीं को दिखती है जिन्हें आप एक्सेस देते हैं।
+        {aiOffered ? ` ${ONBOARDING_AI_COPY.footerHi}` : ""}
       </p>
 
       <JoinPatientDialog isOpen={isJoinOpen} onClose={() => setIsJoinOpen(false)} onSuccess={handleJoined} />

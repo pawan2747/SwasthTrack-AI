@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Activity, ArrowDownRight, ArrowUpRight, HeartPulse, Minus, Moon, Scale, Sparkles, Utensils } from "lucide-react";
+import { TrendNarrativeCard } from "@/components/ai/trend-narrative-card";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/page";
@@ -189,6 +190,9 @@ export function WhatChangedCard({ patientId }: WhatChangedCardProps) {
           })}
         </ul>
       </div>
+
+      {/* The AI note renders nothing unless the family said yes, there is something to say, and no alert is urgent. */}
+      <TrendNarrativeCard patientId={patientId} query={{ view: "changes", period: "7d" }} variant="inline" compact className="mt-3" />
 
       <p lang="hi" className="mt-3 text-xs text-ink-muted">
         यह सिर्फ़ रिकॉर्ड की तुलना है (मध्यमान के आधार पर), निदान नहीं।

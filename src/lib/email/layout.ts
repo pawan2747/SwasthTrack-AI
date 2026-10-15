@@ -385,7 +385,18 @@ export interface ShellOptions {
   base?: string | null;
   /** Trusted text for "Sent to"; defaults to RECIPIENT_TOKEN. */
   recipient?: string;
+  /**
+   * True when a sentence of this mail was phrased by a model: the footer then says so. Absent or false adds
+   * nothing at all (the mail is byte-identical to one that never had the option).
+   */
+  aiNote?: boolean;
 }
+
+/** The footer line that tells the reader a model helped word the summary (never shown otherwise). */
+export const AI_NOTE: Bi = {
+  hi: "सारांश AI की मदद से लिखा गया। आँकड़े आपके रिकॉर्ड से लिए गए हैं।",
+  en: "The summary was written with the help of AI. The figures come from your records.",
+};
 
 function logo(base: string | null, size: number, tile?: number): string {
   const inner = base
@@ -426,7 +437,7 @@ export function emailShell(o: ShellOptions): string {
 <tr><td style="padding:0;background-color:#ffffff;border:1px solid ${C.line};border-top:0;border-radius:0 0 8px 8px;">
 ${TABLE}${sample}${o.sections.join("")}</table>
 </td></tr>
-<tr><td style="padding:18px 22px 6px;">${TABLE}<tr><td width="34" valign="middle" style="width:34px;padding:0;">${logo(base, 26)}</td><td valign="middle" style="padding:0;"><p style="margin:0;${EN}font-size:14px;line-height:18px;font-weight:700;letter-spacing:-0.1px;"><span style="color:${C.navy};">Swasth</span><span style="color:${C.green};">Track</span></p><p style="margin:0;${HI}font-size:10.5px;line-height:15px;color:${C.muted};">परिवार की सेहत, एक जगह<span style="${EN}"> · Your family&#39;s health, in one place</span></p></td></tr></table>${spacer(12).replace("font-size:0;", `font-size:0;border-bottom:1px solid ${C.line};`)}${spacer(12)}${hi(o.reason.hi, { size: 11.5, lh: 18, color: C.muted })}${en(o.reason.en, { size: 11, lh: 16, color: C.muted, mt: 1 })}<p style="margin:6px 0 0;${HI}font-size:11px;line-height:16px;color:${C.subtle};">यह ईमेल <span style="${EN}color:${C.muted};">${recipient}</span> पर भेजा गया<span style="${EN}"> · Sent to ${recipient}</span></p>${links}<table role="presentation" width="100%" style="${T}border-collapse:separate;margin-top:12px;"><tr><td style="padding:8px 10px;border:1px solid ${C.line};border-radius:6px;background-color:#ffffff;">${hi("SwasthTrack एक ट्रैकिंग सहायक है, डॉक्टर की सलाह का विकल्प नहीं।", { size: 11, lh: 17, weight: 600 })}${en("A tracking aid, not a substitute for medical advice.", { size: 10.5, lh: 15, color: C.muted, mt: 1 })}</td></tr></table><p style="margin:10px 0 0;${EN}font-size:10px;line-height:14px;font-weight:400;color:${C.subtle};">&copy; SwasthTrack &nbsp;·&nbsp; Made with care for Indian families</p></td></tr>
+<tr><td style="padding:18px 22px 6px;">${TABLE}<tr><td width="34" valign="middle" style="width:34px;padding:0;">${logo(base, 26)}</td><td valign="middle" style="padding:0;"><p style="margin:0;${EN}font-size:14px;line-height:18px;font-weight:700;letter-spacing:-0.1px;"><span style="color:${C.navy};">Swasth</span><span style="color:${C.green};">Track</span></p><p style="margin:0;${HI}font-size:10.5px;line-height:15px;color:${C.muted};">परिवार की सेहत, एक जगह<span style="${EN}"> · Your family&#39;s health, in one place</span></p></td></tr></table>${spacer(12).replace("font-size:0;", `font-size:0;border-bottom:1px solid ${C.line};`)}${spacer(12)}${hi(o.reason.hi, { size: 11.5, lh: 18, color: C.muted })}${en(o.reason.en, { size: 11, lh: 16, color: C.muted, mt: 1 })}${o.aiNote ? hi(AI_NOTE.hi, { size: 11, lh: 17, color: C.muted, mt: 6 }) + en(AI_NOTE.en, { size: 10.5, lh: 15, color: C.muted, mt: 1 }) : ""}<p style="margin:6px 0 0;${HI}font-size:11px;line-height:16px;color:${C.subtle};">यह ईमेल <span style="${EN}color:${C.muted};">${recipient}</span> पर भेजा गया<span style="${EN}"> · Sent to ${recipient}</span></p>${links}<table role="presentation" width="100%" style="${T}border-collapse:separate;margin-top:12px;"><tr><td style="padding:8px 10px;border:1px solid ${C.line};border-radius:6px;background-color:#ffffff;">${hi("SwasthTrack एक ट्रैकिंग सहायक है, डॉक्टर की सलाह का विकल्प नहीं।", { size: 11, lh: 17, weight: 600 })}${en("A tracking aid, not a substitute for medical advice.", { size: 10.5, lh: 15, color: C.muted, mt: 1 })}</td></tr></table><p style="margin:10px 0 0;${EN}font-size:10px;line-height:14px;font-weight:400;color:${C.subtle};">&copy; SwasthTrack &nbsp;·&nbsp; Made with care for Indian families</p></td></tr>
 </table>
 </td></tr></table>
 </div>

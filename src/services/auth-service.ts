@@ -9,6 +9,8 @@ import {
   invalidatePatientCache,
   type PatientProfile,
 } from "./patient-service";
+import { clearAiSettingsCache } from "./ai-settings-service";
+import { clearVisionAiStatusCache } from "./vision-ai-service";
 
 /**
  * Authentication and caregiver membership (browser side), on top of the app's own
@@ -280,6 +282,9 @@ export async function updateDisplayName(_userId: string, displayName: string): P
  */
 export async function clearLocalUserData(): Promise<void> {
   clearAllPatientCaches();
+  // Another account on this browser must never see the previous one's AI consent or photo-reader status.
+  clearAiSettingsCache();
+  clearVisionAiStatusCache();
   setActivePatientId(null);
   if (typeof window === "undefined") return;
 

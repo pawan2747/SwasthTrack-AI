@@ -5,6 +5,7 @@ import { Pill, Plus, UserRound } from "lucide-react";
 import { AddMedicineDialog } from "@/components/forms/add-medicine-dialog";
 import { MedicationSafetyNote, MedicineAdherenceSummary } from "@/components/medicines/medicine-adherence-summary";
 import { MedicineHistory } from "@/components/medicines/medicine-history";
+import { MedicinePatternCard } from "@/components/medicines/medicine-pattern-card";
 import { MedicineSchedule } from "@/components/medicines/medicine-schedule";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, PageBody, PageHeader } from "@/components/ui/page";
@@ -130,6 +131,7 @@ export default function MedicinesPage() {
         onDateChange={setSelectedDate}
         onAddMedicine={() => setIsAddOpen(true)}
       />
+      <MedicinePatternCard patientId={activePatientId} onOpenDay={openDay} />
       <MedicineHistory patientId={activePatientId} selectedDate={selectedDate} onSelectDate={openDay} />
       <AddMedicineDialog
         isOpen={isAddOpen}

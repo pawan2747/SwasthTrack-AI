@@ -9,6 +9,10 @@ export interface UserMsg {
   id: string;
   role: "user";
   text: string;
+  /** When the person sent it (ms since the epoch; the stored time for an opened conversation). */
+  at: number;
+  /** Read back from a saved conversation, not said in this visit: no "record this" offer for it. */
+  stored?: boolean;
 }
 
 export interface TraceInfo {
@@ -18,7 +22,8 @@ export interface TraceInfo {
   webUrls: string[];
   failure: { reason: string; detail: string } | null;
   privacyFlags: number;
-  config: { model: string; effort: string; webSearch: boolean; hasKey: boolean };
+  /** `provider`, `channel` and `guidelines` come from the router-era server; absent on older payloads. */
+  config: { model: string; effort: string; webSearch: boolean; hasKey: boolean; provider?: string; channel?: string; guidelines?: boolean };
 }
 
 export interface AssistantMsg {
@@ -107,7 +112,7 @@ export function useSoie(patientId: string | null) {
     async (text: string, opts?: { resend?: boolean }): Promise<void> => {
       const message = text.trim();
       if (!message || !patientId || sending) return;
-      if (!opts?.resend) push({ id: nextId("u"), role: "user", text: message });
+      if (!opts?.resend) push({ id: nextId("u"), role: "user", text: message, at: Date.now() });
       setSending(true);
       setLive({ stage: "reading", hi: "डेटा पढ़ रहा हूँ" });
       setLiveTools([]);
@@ -146,7 +151,11 @@ export function useSoie(patientId: string | null) {
           const d = ev.data as Record<string, unknown>;
           if (ev.event === "status") setLive({ stage: d.stage as Stage, hi: String(d.hi ?? "") });
           else if (ev.event === "tool") setLiveTools((t) => (t.includes(String(d.hi)) ? t : [...t, String(d.hi)]));
-          else if (ev.event === "notice") setLiveNotices((n) => [...n, d.notice as Notice]);
+          else if (ev.event === "notice") {
+            // A frame without a notice (or one already shown) would crash the list that keys on `code`.
+            const n = d.notice as Notice | undefined;
+            if (n && typeof n.code === "string") setLiveNotices((prev) => (prev.some((x) => x.code === n.code) ? prev : [...prev, n]));
+          }
           else if (ev.event === "answer") {
             answered = true;
             const sid = (d.sessionId as string | null) ?? null;
@@ -220,7 +229,7 @@ export function useSoie(patientId: string | null) {
       setSessionId(id);
       const out: ChatMsg[] = [];
       for (const row of data) {
-        if (row.role === "user") out.push({ id: `h-${row.id}`, role: "user", text: row.content });
+        if (row.role === "user") out.push({ id: `h-${row.id}`, role: "user", text: row.content, at: Date.parse(String(row.created_at)) || 0, stored: true });
         else if (row.answer) out.push({ id: `h-${row.id}`, role: "assistant", answer: row.answer as unknown as SoieAnswer, messageId: row.id, status: "stored" });
       }
       setMessages(out);

@@ -145,6 +145,7 @@ function WeightEntry({ patientId, presentation, onDone, currentWeight, onSuccess
       ) : null}
       <DisplayPhotoDialog
         kind="weight"
+        patientId={patientId}
         isOpen={photoOpen}
         onClose={() => setPhotoOpen(false)}
         onResult={(v) => {

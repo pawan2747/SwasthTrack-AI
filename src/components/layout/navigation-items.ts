@@ -50,7 +50,7 @@ export const secondaryNavigation: NavigationItem[] = [
 
 /** Developer / QA surface. Only shown to admin accounts. */
 export const developerNavigation: NavigationItem[] = [
-  { href: "/simulation-lab", label: "Simulation Lab", hindiLabel: "सिमुलेशन लैब", icon: FlaskConical },
+  { href: "/simulation-lab", label: "AI & Simulation Lab", hindiLabel: "AI और सिमुलेशन लैब", icon: FlaskConical },
 ];
 
 export const informationNavigation: NavigationItem[] = [

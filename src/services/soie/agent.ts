@@ -1,5 +1,7 @@
 /**
- * The Claude agent loop (manual, so every stop reason is handled explicitly).
+ * The tool channel: the agent loop over an injectable `LlmClient` (manual, so every stop reason is handled
+ * explicitly). The one-call JSON channel lives in json-agent.ts and shares this file's types, verifier and
+ * helpers; the engine picks the channel (TurnConfig.channel).
  *
  * Contract with the model: it may call data tools and the server-side
  * web_search tool, and must END by calling `submit_answer`. Forced tool use is
@@ -20,9 +22,10 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import { knownRefs, refEvidenceText } from "./evidence";
-import { NUDGE_SUBMIT, SYSTEM_PROMPT, buildSnapshot, buildUserMessage, snapshotBase, type HistoryTurn } from "./prompt";
+import { guidelineSnippet } from "./guidelines";
+import { GUIDELINE_TOOL_NOTE, NUDGE_SUBMIT, SYSTEM_PROMPT, buildSnapshot, buildUserMessage, snapshotBase, type HistoryTurn } from "./prompt";
 import { TOOL_LABEL_HI, buildToolDefs, executeTool, type ToolDeps, type ToolRuntime } from "./tools";
-import { coerceDraft, formatViolations, verifyAnswer, type VerifyContext } from "./verify";
+import { coerceDraft, formatViolations, hostOf, normalizeUrl, verifyAnswer, type VerifyContext } from "./verify";
 import type { AnswerDraft, Ledger, PatientContext, ProgressEvent, SafetyAssessment, TraceStep, TurnTelemetry } from "./types";
 
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
@@ -36,6 +39,12 @@ export interface LlmRequest {
   effort: Effort;
   /** Milliseconds this single request may take. */
   timeoutMs: number;
+  /**
+   * The one-call JSON channel: `tools` is empty and the reply must be a single JSON object matching this
+   * schema, returned as one text block. A client that cannot constrain its output may ignore it (the loop
+   * parses the text and the verifier judges it either way).
+   */
+  json?: { name: string; schema: Record<string, unknown> };
 }
 
 export interface LlmTurn {
@@ -69,10 +78,21 @@ export interface AgentOptions {
   ctx: PatientContext;
   ledger: Ledger;
   safety: SafetyAssessment;
-  /** Sanitised question. */
+  /** Sanitised question as the model reads it (names removed). */
   message: string;
   history: HistoryTurn[];
+  /**
+   * The same question BEFORE name removal, for code only (planning which measures it asks about, verifying the
+   * answer against it): it is never put in a prompt. A member whose display name is a metric word ("BP") must not
+   * be able to blank that word out of everyone's question and break the evidence plan.
+   */
+  planMessage?: string;
+  planHistory?: HistoryTurn[];
   webSearch: boolean;
+  /** Offer the curated guideline tool (search_guidelines) next to (or instead of) web search. */
+  guidelines?: boolean;
+  /** The patient's own medicine names for the verifier (default: the context's). Pass the unredacted ones when `ctx` is a scrubbed copy. */
+  medicineNames?: string[];
   canWrite: boolean;
   deps: ToolDeps;
   emit: (e: ProgressEvent) => void;
@@ -81,6 +101,23 @@ export interface AgentOptions {
   deadlineMs?: number;
   maxIterations?: number;
   maxTokens?: number;
+}
+
+/** What the one-call JSON channel put in front of the model (for the admin trace; no health values). */
+export interface PackInfo {
+  channel: "json";
+  metrics: string[];
+  windows: string[];
+  notes: string[];
+  facts: number;
+  droppedFacts: number;
+  prefetched: string[];
+  guidelineIds: string[];
+  /** Characters of the user message (snapshot + evidence + history + question) and of the system prompt. */
+  userChars: number;
+  systemChars: number;
+  /** The router's own estimate for the first request (characters / 2.2 + the output allowance). */
+  estimatedTokens: number;
 }
 
 export interface AgentResult {
@@ -98,6 +135,8 @@ export interface AgentResult {
   privacyFlags: number;
   /** Data-tool results the model may have cited as "tool:N". */
   toolEvidence: Array<{ ref: string; label: string; text: string }>;
+  /** Set by the one-call JSON channel. */
+  pack?: PackInfo;
 }
 
 export const MAX_REPAIRS = 2;
@@ -111,7 +150,7 @@ const STAGE = {
   checking: { hi: "जवाब की जाँच कर रहा हूँ", en: "Checking the answer against your data" },
 } as const;
 
-function webUrlsFrom(content: Anthropic.ContentBlock[]): string[] {
+export function webUrlsFrom(content: Anthropic.ContentBlock[]): string[] {
   const urls: string[] = [];
   for (const b of content) {
     if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
@@ -124,19 +163,39 @@ function webUrlsFrom(content: Anthropic.ContentBlock[]): string[] {
   return urls;
 }
 
+/**
+ * Sites a search result named without a page. The router client marks the sources of Gemini's grounding
+ * (whose own link is a redirect nobody cites) `site_only`; a cited page on that host came from the search.
+ * A real Anthropic result is never site_only, so it vouches for its own page only.
+ */
+export function siteHostsFrom(content: Anthropic.ContentBlock[]): string[] {
+  const hosts: string[] = [];
+  for (const b of content) {
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      for (const r of b.content) {
+        if (r.type === "web_search_result" && (r as unknown as { site_only?: boolean }).site_only === true && r.url) {
+          const h = hostOf(r.url);
+          if (h) hosts.push(h);
+        }
+      }
+    }
+  }
+  return hosts;
+}
+
 /** A web query must stay generic: flag BP pairs, ISO dates or long digit runs. */
-function looksIdentifying(query: string): boolean {
+export function looksIdentifying(query: string): boolean {
   return /\d{2,3}\s*\/\s*\d{2,3}/.test(query) || /\d{4}-\d{2}-\d{2}/.test(query) || /\d{5,}/.test(query);
 }
 
-function textOf(content: Anthropic.ContentBlock[]): string {
+export function textOf(content: Anthropic.ContentBlock[]): string {
   return content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n");
 }
 
-function tryParseJson(text: string): unknown {
+export function tryParseJson(text: string): unknown {
   const t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
   const start = t.indexOf("{");
   const end = t.lastIndexOf("}");
@@ -154,6 +213,9 @@ export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
   const step = (kind: TraceStep["kind"], label: string, detail?: string) => trace.push({ t: Date.now() - t0, kind, label, detail });
   const tele: TurnTelemetry = { intent: null, toolsUsed: [], dataPoints: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, webSearches: 0, repairs: 0 };
   const webUrls = new Set<string>();
+  const webHosts = new Set<string>();
+  const guidelineTexts = new Map<string, string>();
+  const medicineNames = opts.medicineNames ?? opts.ctx.medicines.map((m) => m.name);
   let privacyFlags = 0;
   let model = opts.model;
 
@@ -166,7 +228,7 @@ export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
   let toolSeq = 0;
   const rt: ToolRuntime = { ctx: opts.ctx, ledger: opts.ledger, canWrite: opts.canWrite, allowSave: opts.safety.rememberRequest, deps: opts.deps };
   const vctx = (): VerifyContext => ({
-    userMessage: opts.message,
+    userMessage: opts.planMessage ?? opts.message,
     today: opts.ctx.today,
     range: { from: opts.ctx.range.from, to: opts.ctx.today },
     evidenceTexts: evidence,
@@ -174,13 +236,17 @@ export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
     refText: (r) => toolTexts.get(r) ?? refEvidenceText(r, opts.ctx, opts.ledger),
     knownRefs: refs,
     webUrls,
+    webHosts,
+    guidelineTexts,
+    medicineNames,
     medicineChangeRequest: opts.safety.medicineChangeRequest,
     diagnosisRequest: opts.safety.diagnosisRequest,
     hasAlertFlag: opts.ledger.flags.some((f) => f.severity !== "info"),
   });
 
-  const system: Anthropic.TextBlockParam[] = [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }];
-  const tools = buildToolDefs({ webSearch: opts.webSearch });
+  const systemText = opts.guidelines ? `${SYSTEM_PROMPT}\n\n${GUIDELINE_TOOL_NOTE}` : SYSTEM_PROMPT;
+  const system: Anthropic.TextBlockParam[] = [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }];
+  const tools = buildToolDefs({ webSearch: opts.webSearch, guidelines: opts.guidelines });
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: [{ type: "text", text: buildUserMessage(snapshot, opts.message, opts.history) }] }];
 
   const ac = new AbortController();
@@ -253,6 +319,7 @@ export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
     tele.outputTokens += turn.usage.output_tokens;
     tele.cacheReadTokens += turn.usage.cache_read_input_tokens ?? 0;
     for (const u of webUrlsFrom(turn.content)) webUrls.add(u);
+    for (const h of siteHostsFrom(turn.content)) webHosts.add(h);
     for (const b of turn.content) {
       if (b.type === "server_tool_use" && b.name === "web_search") {
         tele.webSearches += 1;
@@ -304,6 +371,11 @@ export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
         tele.dataPoints += res.dataPoints;
         let content = res.content;
         if (!res.isError) {
+          // Curated guidance: its urls are allowed sources and its text bounds the figures a recommendation may repeat.
+          for (const g of res.guidelines ?? []) {
+            webUrls.add(g.url);
+            guidelineTexts.set(normalizeUrl(g.url), guidelineSnippet(g));
+          }
           // The overview is cited by fact id; every other result is cited by its own tag.
           if (use.name !== "get_overview") {
             const tag = `tool:${++toolSeq}`;
@@ -372,6 +444,6 @@ export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
   return done({ failure: { reason: "iterations", detail: `exceeded ${maxIter} iterations` } });
 }
 
-function isObjectWithQuery(v: unknown): v is { query: string } {
+export function isObjectWithQuery(v: unknown): v is { query: string } {
   return typeof v === "object" && v !== null && typeof (v as { query?: unknown }).query === "string";
 }

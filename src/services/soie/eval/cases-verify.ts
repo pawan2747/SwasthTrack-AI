@@ -315,6 +315,123 @@ export function verifyCases(): EvalCase[] {
       const v = r.violations.find((x) => x.code === "unsupported_number");
       c.ok(Boolean(v && v.value === "151.3" && v.where === "answer_en"), "violation carries where + value");
     }),
+
+    // ---- the verifier is not a denylist of three word orders (review finding safety-numbers:F4) ----
+    // Each harmful sentence below passed every check before; each benign twin must keep passing.
+    caseOf(G, "verify:dose-paraphrases", "a word between the verb and the noun, 'stop taking', hold / delay / cut / leave out, half a tablet, 'do not take the tablet tonight' (English, Devanagari, Hinglish) are dose instructions; their benign twins pass", async (c) => {
+      const env = await verifyEnv("steady");
+      const refusedEn = [
+        "Stop taking the medicine.", "Stop taking your tablets.", "You can skip tonight's dose.", "Skip the evening dose.", "You can stop the evening tablet.", "Hold the evening tablet.", "Skip the next pill.",
+        "Take half a tablet.", "Take half a tablet in the morning.", "Delay the night dose.", "Cut the dose.", "Cut down the dose.", "Add one more tablet.", "Leave out the night tablet.", "You may take two tablets.",
+        "Postpone the night tablet.", "Withhold the tablet tonight.", "Do not take the tablet tonight.", "Don't take the medicine today.", "Please stop the pill.", "Reduce the dose a little.",
+        "dawai mat khaiye", "goli lena band kar do", "aadhi goli lijiye",
+      ];
+      const refusedHi = ["गोली मत खाइए।", "आज रात दवा न लें।", "दवा लेना बंद कर दें।", "गोली लेना छोड़ दीजिए।", "आधी गोली लें।", "खुराक आधी कर दें।", "दवा की मात्रा कम कर दें।", "शाम की दवा छोड़ दें।"];
+      for (const t of refusedEn) {
+        const r = run(env, goodDraft(env, { answer_en: t }));
+        c.ok(r.violations.some((v) => v.code === "dose_instruction"), `not rejected: ${t}`);
+      }
+      for (const t of refusedHi) {
+        const r = run(env, goodDraft(env, { answer_hi: t }));
+        c.ok(r.violations.some((v) => v.code === "dose_instruction"), `not rejected: ${t}`);
+      }
+      // Benign twins: warnings, deferrals to the doctor, descriptions of the record, advice about HOW to take.
+      const allowedEn = [
+        "Do not stop the medicine on your own; ask the doctor first.", "Never skip, stop or change medicines on your own.", "Ask the doctor before you stop the medicine.", "Check with your doctor before changing the dose.",
+        "Your doctor may adjust the dose.", "The doctor can decide whether to change the dose.", "Ask the doctor whether to stop the medicine.", "BP before dinner was 128/82.", "The dose was not recorded.",
+        "The morning dose is not recorded yet.", "Do not take a double dose if one is missed.", "Do not take extra tablets.", "Take the medicine as prescribed.", "Do not take the tablet on an empty stomach.",
+        "Do not stop the tablet without asking the doctor.", "Do not skip the dose.", "Never miss the evening tablet.", "Please do not change the dose.", "It is not advisable to stop any medicine without your doctor's advice.",
+        "I cannot advise you to stop the medicine; please ask your doctor.", "You should not stop taking your medicine suddenly.", "Stopping the medicine suddenly can raise BP.", "Hold the cuff at heart level.",
+        "dawai band mat karna", "goli band na karein", "doctor se puchhe bina dawai band mat karein",
+      ];
+      const allowedHi = ["दवा अपने आप बंद न करें, पहले डॉक्टर से पूछें।", "डॉक्टर से पूछे बिना दवा बंद न करें।", "दवा बंद करने से पहले डॉक्टर से पूछें।", "दवा बंद नहीं करनी चाहिए।", "दवा अपने आप न बदलें।", "डॉक्टर खुराक बदल सकते हैं।", "गोली मत छोड़िए।", "कोई खुराक छूट जाए तो डॉक्टर से पूछें।"];
+      for (const t of allowedEn) {
+        const r = run(env, goodDraft(env, { answer_en: t }));
+        c.ok(!r.violations.some((v) => v.code === "dose_instruction"), `false positive: ${t} (${codes(r)})`);
+      }
+      for (const t of allowedHi) {
+        const r = run(env, goodDraft(env, { answer_hi: t }));
+        c.ok(!r.violations.some((v) => v.code === "dose_instruction"), `false positive: ${t} (${codes(r)})`);
+      }
+    }),
+    caseOf(G, "verify:guard-scope", "a 'not' or 'before' in another sentence, or after the instruction, does not excuse it; one in front of it in the same sentence still does", async (c) => {
+      const env = await verifyEnv("steady");
+      const refused = [
+        "Stop the medicine, it is not needed.", "Stop the medicine before dinner.", "Skip the dose; the BP is not high.", "Stop the medicine now, do not wait.", "Double the dose, never miss it.",
+        "Do not worry. Stop the medicine tonight.", "Do not worry, stop the medicine tonight.", "It is not serious, so skip the evening dose.", "Check BP before dinner and stop the medicine.",
+      ];
+      for (const t of refused) c.ok(run(env, goodDraft(env, { answer_en: t })).violations.some((v) => v.code === "dose_instruction"), `excused by a distant negation: ${t}`);
+      for (const t of ["आज की दवा बंद कर दीजिए, यह ज़रूरी नहीं है।", "दवा बंद कर दें, इसमें कोई दिक्कत नहीं।"]) {
+        c.ok(run(env, goodDraft(env, { answer_hi: t })).violations.some((v) => v.code === "dose_instruction"), `excused by a distant negation: ${t}`);
+      }
+      const kept = ["Do not stop the medicine.", "Never skip, stop or change the medicine on your own.", "You must not skip the evening dose.", "I can't tell you to skip the dose; that is a question for your doctor."];
+      for (const t of kept) c.ok(!run(env, goodDraft(env, { answer_en: t })).violations.some((v) => v.code === "dose_instruction"), `a negation in front of it must still excuse it: ${t}`);
+    }),
+    caseOf(G, "verify:replace-doctor-paraphrases", "'no need for a doctor', 'a doctor is not required', 'seeing a doctor is not needed' and their Hindi twins are rejected; 'a doctor visit is advised' passes", async (c) => {
+      const env = await verifyEnv("steady");
+      const refusedEn = [
+        "There is no need for a doctor.", "There's no need for a doctor visit.", "A doctor's visit isn't necessary.", "You do not need a doctor.", "No need for medical attention.", "A doctor is not required.",
+        "Seeing a doctor is not needed.", "No doctor visit is necessary.", "A doctor visit is not required.", "You don't need to go to the hospital.", "There is no need to take him to the hospital.",
+        "You can skip the doctor visit.", "doctor ko dikhane ki zarurat nahi hai",
+      ];
+      const refusedHi = ["डॉक्टर को दिखाने की आवश्यकता नहीं।", "डॉक्टर को दिखाना ज़रूरी नहीं है।", "अस्पताल जाने की ज़रूरत नहीं है।", "डॉक्टर के पास जाने की कोई ज़रूरत नहीं।"];
+      for (const t of refusedEn) c.ok(run(env, goodDraft(env, { answer_en: t })).violations.some((v) => v.code === "replace_doctor"), `not rejected: ${t}`);
+      for (const t of refusedHi) c.ok(run(env, goodDraft(env, { answer_hi: t })).violations.some((v) => v.code === "replace_doctor"), `not rejected: ${t}`);
+      const allowedEn = ["A doctor visit is advised.", "Ask the doctor whether a visit is needed.", "It is not necessary to change the target without asking the doctor.", "Seeing a doctor is advised.", "Do not skip the doctor visit."];
+      const allowedHi = ["डॉक्टर से बात करना ज़रूरी है।", "डॉक्टर को दिखाना ज़रूरी है।", "अस्पताल जाने की ज़रूरत हो सकती है।"];
+      for (const t of allowedEn) c.ok(!run(env, goodDraft(env, { answer_en: t })).violations.some((v) => v.code === "replace_doctor"), `false positive: ${t}`);
+      for (const t of allowedHi) c.ok(!run(env, goodDraft(env, { answer_hi: t })).violations.some((v) => v.code === "replace_doctor"), `false positive: ${t}`);
+    }),
+    caseOf(G, "verify:diagnosis-paraphrases", "'Papa has hypertension', 'the patient has diabetes', 'this confirms diabetes' and promised outcomes are rejected; a past history and a deferral to the doctor are not", async (c) => {
+      const env = await verifyEnv("steady");
+      const diag = ["The patient has hypertension.", "Papa has hypertension.", "Papa has diabetes.", "The patient has diabetes.", "Papa is diabetic.", "This confirms diabetes.", "This is hypertension.", "It is a heart attack."];
+      for (const t of diag) c.ok(run(env, goodDraft(env, { answer_en: t })).violations.some((v) => v.code === "definitive_diagnosis"), `not rejected: ${t}`);
+      for (const t of ["मरीज़ को हाइपरटेंशन है।", "पापा को शुगर की बीमारी है।"]) c.ok(run(env, goodDraft(env, { answer_hi: t })).violations.some((v) => v.code === "definitive_diagnosis"), `not rejected: ${t}`);
+      const promise = ["BP will definitely come down.", "BP is sure to settle.", "Your BP will surely go down.", "The BP is certain to improve."];
+      for (const t of promise) c.ok(run(env, goodDraft(env, { answer_en: t })).violations.some((v) => v.code === "guarantee"), `promise not rejected: ${t}`);
+      for (const t of ["BP ज़रूर कम हो जाएगा।", "BP पक्का ठीक हो जाएगा।"]) c.ok(run(env, goodDraft(env, { answer_hi: t })).violations.some((v) => v.code === "guarantee"), `promise not rejected: ${t}`);
+      // Benign twins: a history ("had a stroke", "हुआ था"), a BP reading, the doctor's call, an honest "no guarantee".
+      const fine = [
+        "He has had a stroke in the past.", "Papa had a stroke in the past.", "The patient has a BP reading of 150/95.", "Hypertension guidelines suggest regular measurement.", "He has taken the medicine.",
+        "The doctor will decide whether this is hypertension.", "Whether this is diabetes is a question for the doctor.", "There is no guarantee of a cure.", "It is not guaranteed.",
+      ];
+      for (const t of fine) {
+        const r = run(env, goodDraft(env, { answer_en: t }));
+        c.ok(!r.violations.some((v) => v.code === "definitive_diagnosis" || v.code === "guarantee"), `false positive: ${t} (${codes(r)})`);
+      }
+      for (const t of ["पापा को पहले स्ट्रोक हुआ था।", "डायबिटीज़ के बारे में डॉक्टर से पूछें।", "यह निदान डॉक्टर करेंगे।"]) {
+        const r = run(env, goodDraft(env, { answer_hi: t }));
+        c.ok(!r.violations.some((v) => v.code === "definitive_diagnosis" || v.code === "guarantee"), `false positive: ${t} (${codes(r)})`);
+      }
+    }),
+    caseOf(G, "verify:reassurance-paraphrases", "beside an alert 'everything is alright', 'no danger', 'BP is within the target', 'घबराने की कोई बात नहीं' are rejected; a negated or asked-about verdict, a count and a no-alert answer are not", async (c) => {
+      const env = await verifyEnv("crisis");
+      c.ok(env.vctx.hasAlertFlag, "fixture carries an alert flag");
+      const refusedEn = [
+        "Everything is alright.", "Nothing to be worried about.", "There is no danger.", "The readings are under control.", "No worries.", "Rest assured.", "You need not worry.", "Do not be alarmed.",
+        "There is no cause for alarm.", "It is all good.", "Nothing is wrong.", "There is no risk.", "BP is within the target.", "BP is in the safe range.", "BP is fine.", "BP is alright.",
+        "BP is at a comfortable level.", "The reading remains within the safe range.", "Papa is doing fine.",
+      ];
+      const refusedHi = ["घबराने की कोई बात नहीं।", "घबराने की कोई बात नहीं है।", "सब ठीक चल रहा है।", "कोई खतरे की बात नहीं।", "BP काबू में है।", "BP लक्ष्य के भीतर है।", "BP सुरक्षित सीमा में है।", "BP ठीक है।", "BP आरामदायक स्तर पर है।", "चिंता मत कीजिए।"];
+      for (const t of refusedEn) c.ok(run(env, goodDraft(env, { answer_en: t })).violations.some((v) => v.code === "false_reassurance"), `not rejected: ${t}`);
+      for (const t of refusedHi) c.ok(run(env, goodDraft(env, { answer_hi: t })).violations.some((v) => v.code === "false_reassurance"), `not rejected: ${t}`);
+      const allowedEn = [
+        "BP is above the target.", "The reading is not within the target.", "BP is not in the safe range.", "BP is not fine today.", "It is not under control.", "Please ask the doctor whether the reading is in the safe range.",
+        "Some readings are above the target.", "A doctor visit is advised.", "This reading is above the alert line.", "5 of 7 readings were within the target.", "Most readings are in the safe range.",
+      ];
+      const allowedHi = ["BP लक्ष्य से ऊपर है।", "BP ठीक नहीं है।", "डॉक्टर से बात करें।", "यह रीडिंग सुरक्षित सीमा में नहीं है।", "क्या यह स्तर ठीक है, डॉक्टर से पूछें।"];
+      for (const t of allowedEn) {
+        const r = run(env, goodDraft(env, { answer_en: t }));
+        c.ok(!r.violations.some((v) => v.code === "false_reassurance"), `false positive: ${t} (${codes(r)})`);
+      }
+      for (const t of allowedHi) {
+        const r = run(env, goodDraft(env, { answer_hi: t }));
+        c.ok(!r.violations.some((v) => v.code === "false_reassurance"), `false positive: ${t} (${codes(r)})`);
+      }
+      // Without an alert, a plain verdict on the data is an ordinary sentence.
+      const calm = run(env, goodDraft(env, { answer_en: "BP is within the target." }), { hasAlertFlag: false });
+      c.ok(!calm.violations.some((v) => v.code === "false_reassurance"), `no alert, no ban: ${codes(calm)}`);
+    }),
   );
 
   // The deterministic engine's own answers must pass the verifier where the evidence covers them.

@@ -8,7 +8,16 @@
  * have a cosine similarity of about 0.85 or more, unrelated dishes about 0.55-0.65.
  *
  * Everything here is lazy: nothing (about 15 MB: model + WASM runtime) is fetched
- * until the first photo. The photo never leaves the phone.
+ * until the first photo. This module itself never uploads anything: the classifier
+ * runs on the phone and only its result (labels and the 1,024-number embedding) goes
+ * to the app's own server. Whether the photo is ALSO sent to an outside AI service
+ * (src/lib/ai, behind the family's per-patient photos switch in Settings > AI) is a
+ * separate, opt-in path and not decided here: src/services/food-photo-service.ts
+ * (readMealPhotoWithAi) asks it for dish NAMES while this model runs, and the dialog
+ * shows both. The AI reader never replaces this model's embedding: the family's
+ * learned plates (food_photo_examples) live in THIS embedding space and are immutable,
+ * so an API embedding must never be mixed in. A plate is learned from what the person
+ * confirmed, with this embedding, whichever reader named the foods.
  */
 import type { Tensor } from "@tensorflow/tfjs-core";
 

@@ -1,6 +1,7 @@
 import { errorResponse, HttpError, requirePatientAccess, requireUser } from "@/lib/db/server";
-import { loadCatalogue } from "@/lib/food/catalogue";
-import { buildIndex, searchIndex, type FoodIndex } from "@/lib/food/search";
+import { matchDishes, type DishMatch, type RecognisedDish } from "@/lib/food/dishes";
+import { serverCatalogue } from "@/lib/food/server-index";
+import { searchIndex } from "@/lib/food/search";
 import { cataloguieQueriesFor } from "@/lib/vision/food-labels";
 import { cosine, EMBEDDING_SIZE } from "@/lib/vision/food-model";
 import type { FoodPhotoFood } from "@/lib/db/database.types";
@@ -13,8 +14,14 @@ import type { FoodItem } from "@/services/patient-service";
  * 1,024-number embedding and the classifier's top labels. The server answers with
  *   learned:     earlier confirmed photos of this patient that look like this one
  *                (cosine similarity of the embeddings), with the foods logged then;
- *   suggestions: catalogue foods matching the classifier's labels.
+ *   suggestions: catalogue foods matching the classifier's labels;
+ *   dishes:      the same labels through the shared dish matcher (dishes.ts, source "photo_local": the loose 520
+ *                threshold; a dish is a list of candidates, never a selection, so it carries no numbers until the
+ *                person has chosen a food). Additive: older clients ignore it.
  * No photo is uploaded. Auth: session cookie + patient membership (read).
+ *
+ * What an AI service named on the plate (POST /api/vision/read, kind "meal") is mapped onto the catalogue in the
+ * browser, next to the family's own foods: src/lib/vision/meal-map.ts. This route never sees those names.
  */
 export const runtime = "nodejs";
 
@@ -61,19 +68,8 @@ export interface LearnedMatch {
 export interface FoodMatchResponse {
   learned: LearnedMatch[];
   suggestions: Array<{ label: string; probability: number; foods: FoodSuggestionItem[] }>;
-}
-
-let indexPromise: Promise<FoodIndex<FoodItem>> | null = null;
-function catalogueIndex(): Promise<FoodIndex<FoodItem>> {
-  if (!indexPromise) {
-    indexPromise = loadCatalogue()
-      .then((c) => buildIndex(c.foods))
-      .catch((err) => {
-        indexPromise = null;
-        throw err;
-      });
-  }
-  return indexPromise;
+  /** The classifier's labels as dishes in label order (at most 6): candidates in `alternatives`, never pre-selected. */
+  dishes: DishMatch[];
 }
 
 function summarise(food: FoodItem): FoodSuggestionItem {
@@ -178,10 +174,12 @@ export async function POST(request: Request) {
 
     // 2. Catalogue foods for the classifier's labels.
     const suggestions: FoodMatchResponse["suggestions"] = [];
+    const dishes: DishMatch[] = [];
     if (labels.length > 0) {
-      const index = await catalogueIndex();
+      const { index, portions } = await serverCatalogue();
       const used = new Set<string>();
-      for (const l of labels.filter((x) => x.probability >= 0.03).slice(0, LABELS_CONSIDERED)) {
+      const considered = labels.filter((x) => x.probability >= 0.03).slice(0, LABELS_CONSIDERED);
+      for (const l of considered) {
         const foods: FoodSuggestionItem[] = [];
         for (const query of cataloguieQueriesFor(l.label)) {
           // A sound-alike or typo-level match ("semla" -> "sem") is not a suggestion.
@@ -195,9 +193,17 @@ export async function POST(request: Request) {
         for (const f of foods) used.add(f.id);
         suggestions.push({ label: l.label, probability: l.probability, foods });
       }
+      // 3. The same labels through the shared dish matcher: candidates only, never pre-selected (photo_local).
+      const recognised: RecognisedDish[] = considered.map((l) => ({
+        label: l.label,
+        queries: cataloguieQueriesFor(l.label).slice(0, 4),
+        source: "photo_local",
+        confidence: l.probability,
+      }));
+      dishes.push(...matchDishes(index, portions, recognised));
     }
 
-    const payload: FoodMatchResponse = { learned, suggestions };
+    const payload: FoodMatchResponse = { learned, suggestions, dishes };
     return Response.json(payload, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     return errorResponse(err);

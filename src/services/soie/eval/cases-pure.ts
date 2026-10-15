@@ -12,7 +12,7 @@ import { buildLedger } from "../ledger";
 import { refIndex } from "../evidence";
 import { detectMetrics, fold, normalizeDigits, suggestCorrections } from "../normalize";
 import { buildDoseRecords, toBPRecords, logDay, toMedicineInfo, type MedicineRow } from "../records";
-import { assessSafety, detectEmergency } from "../safety";
+import { assessSafety, detectEmergency, readingsInMessage } from "../safety";
 import { resolveTemporal } from "../temporal";
 import type { EmergencyReason, PatientContext } from "../types";
 import { answerWithRules } from "../fallback";
@@ -72,6 +72,57 @@ const EMERGENCY_POSITIVE: Array<[string, string, EmergencyReason]> = [
   ["vomiting blood", "ulti mein khoon aaya", "vomiting_blood"],
   ["severe bleeding", "severe bleeding from the leg", "severe_bleeding"],
   ["stroke now", "stroke aa gaya lagta hai", "stroke_suspected"],
+  // Ordinary phrasings the first list did not know (review safety-numbers:F1): not breathing, "had a stroke",
+  // "gir gaye", plural / feminine "rahe / rahi", slurred / numb / not recognising, fits, a weight on the chest.
+  ["not breathing", "he is not breathing", "breathless"],
+  ["stopped breathing", "he stopped breathing", "breathless"],
+  ["breathing has stopped", "papa ki breathing has stopped", "breathless"],
+  ["saans band hinglish", "papa ki saans band ho gayi", "breathless"],
+  ["saans band devanagari", "पापा की सांस बंद हो गई", "breathless"],
+  ["had a stroke, english", "my father had a stroke", "stroke_suspected"],
+  ["stroke hua hai", "papa ko stroke hua hai", "stroke_suspected"],
+  ["brain stroke ho gaya", "papa ko brain stroke ho gaya", "stroke_suspected"],
+  ["stroke ka attack", "papa ko stroke ka attack", "stroke_suspected"],
+  ["stroke devanagari", "पापा को स्ट्रोक हुआ है", "stroke_suspected"],
+  ["gir gaye (honorific plural)", "papa gir gaye", "fainting"],
+  ["gir gaya", "papa gir gaya", "fainting"],
+  ["gir gayi, then not getting up", "mummy gir gayi aur uth nahi pa rahi", "fainting"],
+  ["gir gaye devanagari", "पापा गिर गए", "fainting"],
+  ["uth nahi rahe", "papa uth nahi rahe", "unresponsive"],
+  ["jag nahi rahe", "papa jag nahi rahe", "unresponsive"],
+  ["hil nahi rahe", "papa hil nahi rahe", "unresponsive"],
+  ["uth nahi pa rahi (feminine)", "mummy uth nahi pa rahi", "unresponsive"],
+  ["uth nahi pa rahe devanagari", "पापा उठ नहीं पा रहे", "unresponsive"],
+  ["speech is slurred", "his speech is slurred", "slurred_speech"],
+  ["awaz nahi aa rahi", "papa ki awaz nahi aa rahi", "slurred_speech"],
+  ["left arm is numb", "left arm is numb", "one_sided_weakness"],
+  ["baya haath sunn", "papa ka baya haath sunn ho gaya", "one_sided_weakness"],
+  ["not recognising me", "he is not recognising me", "confusion"],
+  ["fits aa rahe", "papa ko fits aa rahe hain", "seizure"],
+  ["weight on the chest", "papa ke seene par pathar jaisa bojh", "chest_pain"],
+  ["bhaaripan with sweating", "papa ko pasina aa raha hai aur seene mein bhaaripan", "chest_pain"],
+  // A negator that belongs to ANOTHER clause, a tag particle, "koi upay", "not sure" (review safety-numbers:F2).
+  ["negator in another clause (comma)", "papa ne dawai nahi li, seene mein dard hai", "chest_pain"],
+  ["negator in another clause (devanagari)", "पापा ने दवा नहीं ली, सीने में दर्द है", "chest_pain"],
+  ["negator in another clause (khana)", "papa ne khana nahi khaya, seene mein dard hai", "chest_pain"],
+  ["negator in another clause, no comma", "papa ne dawai nahi li seene mein dard hai", "chest_pain"],
+  ["missed medicine, then fainting", "papa ne dawai nahi li, behosh ho gaye", "fainting"],
+  ["missed medicine, then fainting, no comma", "papa ne dawai nahi li behosh ho gaye", "fainting"],
+  ["missed medicine and (aur) chest pain", "papa ne dawai nahi li aur seene mein dard hai", "chest_pain"],
+  ["koi upay", "seene mein dard hai, koi upay batao", "chest_pain"],
+  ["koi upay, no comma", "seene mein dard hai koi upay batao", "chest_pain"],
+  ["tag particle na", "seene mein dard hai na, kya karein", "chest_pain"],
+  ["tag particle na (breathless)", "papa ko saans lene mein takleef hai na", "breathless"],
+  ["not sure what to do", "Papa has chest pain, not sure what to do", "chest_pain"],
+  ["not sure, no comma", "Papa has chest pain not sure what to do", "chest_pain"],
+  ["nahi pata", "seene mein dard hai nahi pata kya karein", "chest_pain"],
+  ["without sweating", "he has chest pain without sweating", "chest_pain"],
+  ["chest pain, no fever (a list)", "he has chest pain no fever", "chest_pain"],
+  ["chest pain not going away", "chest pain not getting better", "chest_pain"],
+  ["dard nahi ruk raha (not stopping)", "seene mein dard nahi ruk raha", "chest_pain"],
+  ["na jaane kyun (idiom)", "seene mein dard na jaane kyun ho raha hai", "chest_pain"],
+  ["was not there, now it is", "seene mein dard nahi tha ab ho raha hai", "chest_pain"],
+  ["a line break ends a clause", "papa ne dawai nahi li\nseene mein dard hai", "chest_pain"],
 ];
 
 const EMERGENCY_NEGATIVE: Array<[string, string]> = [
@@ -83,6 +134,55 @@ const EMERGENCY_NEGATIVE: Array<[string, string]> = [
   ["user confusion", "I am confused about the diet plan"],
   ["salt question", "how to reduce sodium in dal"],
   ["plain summary", "आज पापा कैसे रहे?"],
+  // Benign twins of the new phrases: history, a reading that fell, a dropped glass, an app, a cold, a TV.
+  ["history: stroke hua tha", "papa ko pichle saal stroke hua tha"],
+  ["history: stroke aaya tha", "pichle saal stroke aaya tha"],
+  ["history: stroke ka attack aaya tha", "stroke ka attack aaya tha"],
+  ["history: stroke ho gaya tha", "papa ko stroke ho gaya tha, ab diet kya ho"],
+  ["history: years ago, perfect tense", "papa ko 2 saal pehle stroke hua hai, diet kya ho"],
+  ["history: english, last year", "papa had a stroke last year, what should he eat"],
+  ["history: english, a year number", "he had a stroke in 2019"],
+  ["history: english, years ago", "he had a stroke 3 years ago"],
+  ["history: devanagari tha", "पापा को स्ट्रोक हुआ था"],
+  ["history: devanagari last year", "पिछले साल स्ट्रोक आया था"],
+  ["negated: stroke nahi hua", "papa ko stroke nahi hua hai"],
+  ["BP gir gaya (papa ka)", "papa ka BP gir gaya"],
+  ["BP gir gaya (papa, no ka)", "papa BP gir gaya"],
+  ["sugar gir gayi", "sugar gir gayi"],
+  ["weight gir gaya (papa ka)", "papa ka weight gir gaya"],
+  ["glass gir gaya", "papa ka glass gir gaya"],
+  ["papa gir nahi gaye (negated)", "papa gir nahi gaye"],
+  ["BP gir gaya, the person comes after", "BP gir gaya hai papa ka kya karun"],
+  ["sugar gir gaya, the person comes after", "sugar gir gaya papa ka, kya dun"],
+  ["a fall long ago", "mummy pichle mahine gir gayi thi, ab kamar mein dard hai"],
+  ["a number that had a fall", "his BP had a fall from 150 to 120"],
+  ["stopped breathing EXERCISES", "he stopped breathing exercises last week"],
+  ["not breathing exercise", "papa not breathing exercise karte"],
+  ["app not recognising", "the app is not recognising me"],
+  ["breathing exercise", "breathing exercise kaise karein"],
+  ["pranayam, saans band karke", "saans band karke pranayam kitni der karein"],
+  ["TV ki awaz", "TV ki awaz nahi aa rahi"],
+  ["a cold, voice gone", "papa ki awaz nahi aa rahi, gala kharab hai"],
+  ["left arm is NOT numb", "left arm is not numb"],
+  // Negation that must keep working (the clause-scoped version of the same rule).
+  ["no chest pain", "no chest pain"],
+  ["koi dard nahi", "koi dard nahi"],
+  ["koi dard nahi hai (seene)", "seene mein koi dard nahi hai"],
+  ["does not have", "he does not have chest pain"],
+  ["never had", "he never had chest pain"],
+  ["no more", "no more chest pain"],
+  ["is not there now", "chest pain is not there now"],
+  ["devanagari koi dard nahi", "सीने में कोई दर्द नहीं"],
+  ["behosh nahi hue", "behosh nahi hue"],
+  ["not confused", "he is not confused"],
+  ["tag na after a negation", "seene mein dard nahi hai na"],
+  ["na ho (so that it does not happen)", "seene mein dard na ho isliye dawai li"],
+  ["kabhi nahi hota", "seene mein dard kabhi nahi hota"],
+  ["nahi ho raha", "seene mein dard nahi ho raha"],
+  ["a speech-to-text comma before nahi hai", "seene mein dard, nahi hai"],
+  ["an answer: chest pain? no", "chest pain? no"],
+  ["without any", "without any chest pain"],
+  ["a missed medicine is not a symptom", "papa ne dawai nahi li"],
 ];
 
 // --- temporal -----------------------------------------------------------------
@@ -275,6 +375,66 @@ export function pureCases(): EvalCase[] {
       const a = assessSafety("BP 190/125 aa raha hai");
       c.eq(a.crisisReading?.systolic, 190, "systolic");
       c.eq(a.crisisReading?.source, "user_message", "source");
+    }),
+    caseOf("safety: crisis", "crisis:typed-separators", "a crisis reading typed with pe / par / a dash / a bare pair after a BP word / upper-lower is caught", (c) => {
+      const lead: Array<[string, number, number]> = [
+        ["papa ka BP 200 pe 120 hai", 200, 120],
+        ["BP 190 par 125", 190, 125],
+        ["बीपी 190 पर 125", 190, 125],
+        ["BP 190-125", 190, 125],
+        ["BP 190 125", 190, 125],
+        ["BP 190 aur 125 hai", 190, 125],
+        ["upper 190 lower 125", 190, 125],
+        ["ऊपर 190 नीचे वाला 125", 190, 125],
+        ["bp १९०/१२५", 190, 125],
+      ];
+      for (const [q, sys, dia] of lead) {
+        const a = assessSafety(q);
+        c.eq([a.crisisReading?.systolic, a.crisisReading?.diastolic, a.crisisReading?.kind, a.crisisReading?.source], [sys, dia, "high", "user_message"], `lead for ${JSON.stringify(q)}`);
+      }
+    }),
+    caseOf("safety: crisis", "crisis:typed-very-low", "a very low reading typed by the user leads like a logged one; a merely low one does not", (c) => {
+      const a = assessSafety("papa ka BP 70/40 aa raha hai aur ghabrahat");
+      c.eq([a.crisisReading?.systolic, a.crisisReading?.diastolic, a.crisisReading?.kind, a.crisisReading?.source], [70, 40, "low", "user_message"], "70/40");
+      c.eq(assessSafety("BP 85/55 hai").crisisReading, null, "85/55 is low but not urgent");
+      c.eq(assessSafety("BP 120/80 hai").crisisReading, null, "normal");
+      c.eq(assessSafety("ghee tel ratio 70/40 rakhte hain").crisisReading, null, "a ratio with no BP word is not a reading");
+    }),
+    caseOf("safety: crisis", "crisis:typed-not-a-reading", "calories, days, grams and dates next to two numbers are not a reading", (c) => {
+      for (const q of [
+        "aaj 140 125 calories khaye",
+        "BP kaisa hai pichle 120 din",
+        "BP 10 12 din",
+        "BP 15-20 din ka average",
+        "dal 200-120 gm khayi",
+        "bp aaj 190 125 calories",
+        "15-08-2026 ko bp",
+        "2026-10-04 ka bp",
+        "sugar 190 par 125 tha",
+        "wajan 200 pe 120 ho gaya",
+      ]) {
+        const a = assessSafety(q);
+        c.eq(a.crisisReading, null, `no crisis for ${JSON.stringify(q)}`);
+        c.eq(readingsInMessage(q).filter((r) => r.systolic >= 180), [], `no reading in ${JSON.stringify(q)}`);
+      }
+    }),
+    caseOf("safety: crisis", "crisis:typed-leads-the-rules-answer", "a typed 'pe' reading leads the rules answer whatever else was asked", async (c) => {
+      const ctx = fixture("steady");
+      const r = await runTurn({ ctx, message: "papa ka BP 200 pe 120 hai", history: [], canWrite: false }, { client: null, model: "m", effort: "high", webSearch: false, deps: { saveMemory: async () => ({ id: "x" }) } });
+      c.ok(r.answer.answer_en.startsWith("Important:"), "starts with the crisis notice");
+      c.includes(r.answer.answer_en.split("\n")[0], "200/120", "first line states the typed reading");
+      c.eq(r.answer.safety_level, "escalate", "safety_level");
+    }),
+    caseOf("safety: emergency", "emergency:gate-text-forms", "the review's phrasings reach the fixed emergency answer with no model call, whatever the punctuation", async (c) => {
+      const ctx = fixture("steady");
+      for (const message of ["he is not breathing", "papa ne dawai nahi li, seene mein dard hai", "papa gir gaye", "papa ko stroke hua hai", "papa uth nahi rahe"]) {
+        let calls = 0;
+        const client = { async complete(): Promise<never> { calls++; throw new Error("must not be called"); } };
+        const r = await runTurn({ ctx, message, history: [], canWrite: true }, { client, model: "m", effort: "high", webSearch: true, deps: { saveMemory: async () => ({ id: "x" }) } });
+        c.eq(calls, 0, `model calls for ${JSON.stringify(message)}`);
+        c.eq(r.status, "emergency", `status for ${JSON.stringify(message)}`);
+        c.includes(r.answer.answer_en, "112", `112 for ${JSON.stringify(message)}`);
+      }
     }),
     caseOf("safety: crisis", "crisis:lead", "whatever is asked, the answer leads with the crisis reading", async (c) => {
       const ctx = fixture("crisis");

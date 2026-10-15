@@ -5,16 +5,24 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Stage } from "@/services/soie/types";
 
-const STEPS: Array<{ key: Stage; hi: string; optional?: boolean }> = [
+/**
+ * Every stage the server can emit (src/services/soie/types.ts `Stage`). `only` marks a step that belongs to
+ * one path: the AI path goes reading -> analysing -> (searching) -> checking; the rules engine, which writes
+ * its answer directly, goes reading -> writing. Showing "analysing / checking" as done for an answer that
+ * never had them would be a made-up progress bar.
+ */
+const STEPS: Array<{ key: Stage; hi: string; optional?: boolean; only?: "ai" | "rules" }> = [
   { key: "reading", hi: "डेटा पढ़ रहा हूँ" },
-  { key: "analysing", hi: "विश्लेषण" },
-  { key: "searching", hi: "इंटरनेट पर खोज", optional: true },
-  { key: "checking", hi: "जाँच" },
+  { key: "analysing", hi: "विश्लेषण", only: "ai" },
+  { key: "searching", hi: "इंटरनेट पर खोज", optional: true, only: "ai" },
+  { key: "checking", hi: "जाँच", only: "ai" },
+  { key: "writing", hi: "नियमों से जवाब बना रहा हूँ", only: "rules" },
 ];
 
 /** Live progress while SOIE works. The stages come from the server's real events, not a timer. */
 export function ProgressCard({ stage, tools, webSearch }: { stage: Stage; tools: string[]; webSearch: boolean }) {
-  const steps = STEPS.filter((s) => !s.optional || webSearch || stage === "searching");
+  const path = stage === "writing" ? "rules" : "ai";
+  const steps = STEPS.filter((s) => (!s.only || s.only === path) && (!s.optional || webSearch || stage === "searching"));
   const idx = Math.max(0, steps.findIndex((s) => s.key === stage));
   const current = steps[idx];
   return (

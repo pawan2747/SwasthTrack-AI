@@ -14,7 +14,8 @@ Browser (PWA)                      Vercel (Next.js 16, webpack)                M
   |  HttpOnly session cookie          |                                             |
   |--- /api/auth/*  sign-up, codes -->| src/lib/auth   (users, sessions, e-mail OTP)|
   |--- /api/db      data queries ---->| src/lib/db     (access rules + SQL)  ------>|  db/mysql/schema.sql
-  |--- /api/soie    Ask assistant --->| SOIE engine ---> Anthropic API (optional)   |
+  |--- /api/soie    Ask assistant --->| SOIE engine -+                              |
+  |--- /api/ai/*, /api/vision/* ----->| src/lib/ai   -+--> Gemini / Groq / OpenRouter (optional)
   |                                   | /api/cron/*    reports (read-only system)   |
   |                                   | e-mail (SMTP, Resend) for codes + reports   |
 ```
@@ -36,8 +37,10 @@ Copy `.env.example` to `.env.local` for local work. Set the same names in
 | `DATABASE_SSL`, `DATABASE_SSL_CA`, `DATABASE_SSL_REJECT_UNAUTHORIZED`, `DATABASE_POOL_SIZE` | Optional | TLS switch (same as `?ssl=true`), a private CA certificate (PEM text or file path), `false` ONLY for a throwaway test, and the pool size (default 5; keep it small on serverless) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (or `RESEND_API_KEY`), `EMAIL_FROM` | **Yes** (production) | Sends the 6-digit sign-in codes and the report e-mails. **Without SMTP nobody can sign up in production** (in development the code is printed in the server console instead). With Resend, `EMAIL_FROM` must be on a domain you verified in Resend: the free sandbox sender `onboarding@resend.dev` only delivers to the Resend account owner's own address |
 | `NEXT_PUBLIC_APP_URL` | Optional | Public address of the site, for the logo and links in e-mails |
-| `ANTHROPIC_API_KEY` | Recommended | Powers the LLM answers in Ask (SOIE). Without it the assistant answers from the rule-based engine and says so. Never prefix with `NEXT_PUBLIC_` |
-| `SOIE_MODEL`, `SOIE_WEB_SEARCH`, `SOIE_RATE_LIMIT_PER_HOUR`, `SOIE_EFFORT`, `SOIE_TIMEOUT_MS` | Optional | SOIE tuning, see `.env.example` |
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` | Recommended (any one) | The AI services behind photo reading, summaries, voice and Ask. More keys per provider: `GEMINI_API_KEY_2` ... `_9` or `GEMINI_API_KEYS=a,b`. Without any key every AI feature uses the app's own rules, and Settings > AI says AI is not turned on. Never prefix with `NEXT_PUBLIC_`. **Add them for Production and for Preview**, then Redeploy |
+| `AI_PRIVACY`, `GEMINI_PLAN`, `OPENROUTER_PLAN` | Optional | `AI_PRIVACY=balanced` (default) \| `strict` \| `performance`: where health content may go. `GEMINI_PLAN=paid` only when billing is really enabled on that Google project (it makes the app treat the key as non-training). See [`docs/ai.md`](ai.md) |
+| `AI_ENABLED`, `AI_FEATURES_OFF`, `AI_PROVIDER_ORDER`, `AI_RATE_LIMIT_PER_HOUR`, `AI_PATIENT_DAILY_LIMIT`, `AI_GLOBAL_DAILY_LIMIT`, `AI_TIMEOUT_MS`, `GROQ_MAX_INPUT_TOKENS`, `*_MODELS_*` | Optional | Kill switches, order, limits and model lists. Defaults are fine; the table is in [`docs/ai.md`](ai.md) |
+| `SOIE_WEB_SEARCH`, `SOIE_RATE_LIMIT_PER_HOUR`, `SOIE_EFFORT`, `SOIE_TIMEOUT_MS` | Optional | Ask tuning, see `.env.example` and [`docs/soie.md`](soie.md). |
 | `CRON_SECRET` | Only if scheduled report e-mails are on | Read by the `/api/cron/*` routes scheduled in `vercel.json`. Each patient's report is built by a read-only system identity that sees only that patient, and is mailed to the patient's owner and active caregivers (no per-patient setting needed). `REPORT_EMAIL_TO` / `REPORT_PATIENT_ID` are no longer needed for this |
 
 Rules of thumb:
@@ -78,6 +81,16 @@ mistakes in words:
 Heads-up for managed hosts: allow connections from Vercel. Vercel does not have fixed
 IP addresses, so either allow all IPs (strong password + TLS), or use a provider that
 supports Vercel integration or private networking.
+
+### The AI tables
+
+`ai_cache` (saved AI notes), `ai_events` (request counters, no content) and
+`patient_ai_settings` (the family's switches) are server-only tables, also in
+`db/mysql/schema.sql`. The app creates them on first use, so a normal deployment needs
+nothing. If the database user may not run `CREATE TABLE`, run `npm run db:migrate`
+once from your computer: until then Settings > AI says "AI की सेटिंग अभी पढ़ी नहीं जा सकती",
+no AI feature runs and nothing leaves the app. `npm run db:check-schema` checks that the
+runtime DDL and `schema.sql` agree.
 
 ### Moving the data from Supabase (one time)
 
@@ -169,15 +182,24 @@ Install:
   Expected: `{"data":null,"error":{"message":"Sign in required","code":"401"},"count":null}`.
 - [ ] A second account that is not a member of the patient sees no patient data.
 - [ ] The database accepts connections only with TLS and a strong password.
-- [ ] Ask (`/ask`) answers. If `ANTHROPIC_API_KEY` is missing the page says the
-      rule-based engine is answering.
+- [ ] Ask (`/ask`) answers. With no AI key (or AI switched off for the family) the
+      page says the rule-based engine is answering.
+- [ ] **AI, if you set keys.** Sign in as an admin and open Simulation Lab > "AI services":
+      each provider you configured shows its key count and a "check now" gets an
+      answer. Then, as a patient's owner, open Settings > AI सहायता: the two switches
+      show "अभी पूछा नहीं गया" for a new patient and nothing is sent until you turn one
+      on. Switch text off again and confirm the saved notes are gone.
+- [ ] **Keys are on both environments.** In Vercel the AI variables exist for Production
+      *and* Preview, and the last deployment happened after they were added.
 - [ ] Signing out returns to `/login` and the browser back button does not show health data.
 
 ## 7. Secrets
 
 1. Never commit `.env.local`. Rotate any key or password that was ever committed or pasted
    into a chat, an issue or a screenshot (the database password, the Resend key, the
-   Anthropic key, `CRON_SECRET`, `AUTH_SECRET`).
+   Gemini / Groq / OpenRouter keys, `CRON_SECRET`, `AUTH_SECRET`). To rotate an AI key
+   without a gap: add the new one as `GEMINI_API_KEY_2` (or into `GEMINI_API_KEYS`),
+   redeploy, check Simulation Lab > "AI services", then delete the old one and redeploy.
 2. The old Supabase project is no longer used by the app. Once you have verified the copy
    in MySQL, remove its keys from `.env.local`, and pause or delete that project.
 3. Rotating `AUTH_SECRET` is safe (users only need new e-mail codes). Rotating the database

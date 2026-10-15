@@ -22,7 +22,10 @@ export function TracePanel({ trace }: { trace: TraceInfo }) {
           <div className="flex flex-wrap gap-1.5">
             <Badge variant="neutral">model {trace.config.model}</Badge>
             <Badge variant="neutral">effort {trace.config.effort}</Badge>
-            <Badge variant={trace.config.hasKey ? "positive" : "attention"}>{trace.config.hasKey ? "API key set" : "no API key"}</Badge>
+            <Badge variant={trace.config.hasKey ? "positive" : "attention"}>{trace.config.hasKey ? "AI on" : "AI off (rules only)"}</Badge>
+            {trace.config.provider ? <Badge variant="neutral">provider {trace.config.provider}</Badge> : null}
+            {trace.config.channel ? <Badge variant="neutral">channel {trace.config.channel}</Badge> : null}
+            {trace.config.guidelines !== undefined ? <Badge variant="neutral">guidelines {trace.config.guidelines ? "on" : "off"}</Badge> : null}
             <Badge variant="neutral">web {trace.config.webSearch ? "on" : "off"}</Badge>
             {trace.privacyFlags > 0 ? <Badge variant="critical">privacy flags {trace.privacyFlags}</Badge> : null}
             {trace.failure ? <Badge variant="attention">AI failure: {trace.failure.reason}</Badge> : null}

@@ -7,6 +7,12 @@
  * "when is this item due" times and the missed-dose rule come from
  * `@/lib/health-rules` and the patient's own settings, so these e-mails agree with
  * what the app itself shows.
+ *
+ * Model-written text (the day's paragraph, a week's or month's trend note, the phrasing of the medicine
+ * pattern note) is an optional layer: a builder receives an `EmailAi` through its options, or nothing. Without
+ * one, or whenever a step of it fails, the mail is built from the same data and is exactly the mail it would be
+ * if no model had ever existed. The patterns themselves (which medicine keeps slipping, what was left over
+ * yesterday) are code, so they reach the mail with or without a model.
  */
 
 import type { DbClient } from "@/lib/db/builder";
@@ -25,6 +31,19 @@ import {
   type BPClassification,
   type BPThresholds,
 } from "@/lib/health-rules";
+import { buildMedicineNote, type MedicineNote } from "@/lib/ai/tasks/medicine-text";
+import { pickNudges, type BpMedContext, type DosePatternReport } from "@/lib/analytics/medicine-patterns-calc";
+import {
+  doseContextOf,
+  emailPatternReport,
+  hasMilestonePattern,
+  insightSeverity,
+  medicineCoachFrom,
+  medicineInsightAlert,
+  reminderHasReason,
+  yesterdayRows,
+} from "@/lib/email/ai-blocks";
+import type { EmailAi } from "@/lib/email/ai-types";
 import { clock12, clockBi, dateBi, mealBi, todayAtBi, type Bi } from "@/lib/email/format";
 import {
   renderBpAlertEmail,
@@ -34,7 +53,11 @@ import {
   renderWeeklyReport,
   renderWeightAlertEmail,
   type BpTone,
+  type DoseContext,
   type EmailAlert,
+  type EmailMedicineCoach,
+  type EmailNarrative,
+  type EmailSummary,
   type RenderedEmail,
 } from "@/lib/email/templates";
 import {
@@ -53,6 +76,7 @@ import {
   type MedicineItem,
   type MedicineLogEntry,
 } from "./patient-service";
+import { buildPatternView, loadPatternInputs } from "./medicine-pattern-service";
 import { getMonthlyReportData, getWeeklyReportData } from "./reports-analytics-service";
 import {
   getPatientSettingsOrDefault,
@@ -303,20 +327,117 @@ function bpTodayAlert(s: DaySnapshot): EmailAlert | null {
 }
 
 // ----------------------------------------------------
+// Medicine patterns and the optional model layer
+// ----------------------------------------------------
+
+/** What every builder may be given. */
+export interface EmailBuildOptions {
+  /** The scheduled model helper. Absent (or null): the mail has no model text at all. */
+  ai?: EmailAi | null;
+}
+
+/** Look-backs (days) the patterns are read over, per mail. */
+const PATTERN_DAYS = { reminder: 14, daily: 14, weekly: 7, monthly: 30 } as const;
+
+interface PatternRead {
+  /** The engine's own report (yesterday's left-over doses included). */
+  report: DosePatternReport;
+  bp: BpMedContext;
+  /** alerts_enabled.medicine */
+  enabled: boolean;
+}
+
+/**
+ * EMAIL_MEDICINE_PATTERNS=off switches the whole medicine-pattern layer of the mails off (yesterday's doses in
+ * the reminder, the pattern note, the medicine alerts in the daily report, the BP alert's dose row): with it off
+ * and no model object, every mail is exactly the mail that existed before the layer.
+ */
+export function medicinePatternsOn(env: string | undefined = process.env.EMAIL_MEDICINE_PATTERNS): boolean {
+  return !/^(0|false|no|off|disabled?)$/i.test(env?.trim() ?? "");
+}
+
+/** The dose patterns of the last `days` days, or null when they cannot be read (or are switched off): a mail never fails for them. */
+async function readPatterns(patientId: string, now: Date, days: number): Promise<PatternRead | null> {
+  if (!medicinePatternsOn()) return null;
+  try {
+    const inputs = await loadPatternInputs(patientId, now);
+    const view = buildPatternView(inputs, days);
+    return { report: view.report, bp: view.bp, enabled: inputs.medicineAlertsEnabled };
+  } catch (err) {
+    console.warn("[email] skipped medicine patterns:", err instanceof Error ? err.name : "error");
+    return null;
+  }
+}
+
+/**
+ * The medicine pattern note for a mail: model-phrased when a model may be asked, else the code-made sentence.
+ * Null when there is nothing worth saying or the family turned medicine alerts off. Never throws.
+ */
+async function medicineNoteFor(patientId: string, read: PatternRead | null, ai: EmailAi | null): Promise<MedicineNote | null> {
+  if (!read || !read.enabled) return null;
+  const args = { patientId, patterns: emailPatternReport(read.report), bp: read.bp, medicineAlertsEnabled: read.enabled };
+  try {
+    if (ai) return await ai.medicineNote(args);
+    return await buildMedicineNote({ ...args, userId: "", audience: "family_email", useAi: false });
+  } catch (err) {
+    console.warn("[email] skipped medicine note:", err instanceof Error ? err.name : "error");
+    return null;
+  }
+}
+
+/** In-app alerts about ONE medicine row or the BP-with-gap statement: the pattern note already says them. */
+const PATTERN_ALERT_KEY = /^alert-anom-med-(slot|weekday|bpgap)-/;
+
+// ----------------------------------------------------
 // Builders (return null when there is nothing worth sending)
 // ----------------------------------------------------
 
-/** Midday check: things that are late but not yet in the 9 PM report. */
+/**
+ * Midday check: things that are late but not yet in the 9 PM report.
+ *
+ * A mail exists when something is unresolved today (a dose past its time, a record missing, days without data)
+ * or yesterday (a dose nobody recorded or somebody marked missed, at any time of day: a night dose used to be
+ * mailed never), or when an important-tier medicine pattern sits exactly on an escalation milestone. A pattern
+ * of lower tier never creates a mail by itself, and a run of misses that is not on a milestone does not either,
+ * so the same warning is not repeated every day.
+ */
 export async function buildMissedAlertsEmail(
   patientId: string,
   now: Date = new Date(),
+  options: EmailBuildOptions = {},
 ): Promise<RenderedEmail | null> {
-  const s = await loadDaySnapshot(patientId, now);
+  const [s, patterns] = await Promise.all([loadDaySnapshot(patientId, now), readPatterns(patientId, now, PATTERN_DAYS.reminder)]);
 
+  const medicineOn = isAlertEnabled(s.settings, "medicine") && patterns !== null && patterns.enabled;
   const missedMedicines = isAlertEnabled(s.settings, "medicine") ? s.missedRows : [];
   const missingRecords = dueGaps(s, istMinutesOfDay(now));
   const noData = daysWithoutData(s);
-  if (missedMedicines.length === 0 && missingRecords.length === 0 && noData === null) return null;
+  const yesterdayMissed = medicineOn && patterns ? yesterdayRows(patterns.report) : [];
+  const milestone = medicineOn && patterns ? hasMilestonePattern(patterns.report) : false;
+  if (
+    !reminderHasReason({
+      missedToday: missedMedicines.length,
+      missingRecords: missingRecords.length,
+      noDataDays: noData,
+      yesterday: yesterdayMissed.length,
+      milestone,
+    })
+  ) {
+    return null;
+  }
+
+  // The mail exists: now (and only now) the pattern note, with a model's phrasing when one may be asked.
+  let medicineInsight: EmailAlert | undefined;
+  let aiAssisted = false;
+  if (medicineOn && patterns) {
+    const note = await medicineNoteFor(patientId, patterns, options.ai ?? null);
+    if (note) {
+      medicineInsight = medicineInsightAlert(note, insightSeverity(emailPatternReport(patterns.report), patterns.bp));
+      aiAssisted = note.source === "ai";
+    }
+  }
+  // A pattern alone created this mail: without its words there is nothing to send.
+  if (!medicineInsight && missedMedicines.length === 0 && missingRecords.length === 0 && noData === null && yesterdayMissed.length === 0) return null;
 
   return renderReminderEmail({
     patientName: s.patientName,
@@ -324,13 +445,26 @@ export async function buildMissedAlertsEmail(
     missedMedicines,
     missingRecords,
     daysWithoutData: noData,
+    ...(yesterdayMissed.length > 0 ? { yesterdayMissed } : {}),
+    ...(medicineInsight ? { medicineInsight } : {}),
+    ...(aiAssisted ? { aiAssisted } : {}),
   });
 }
 
 export async function buildDailyReportEmail(
   patientId: string,
   now: Date = new Date(),
+  options: EmailBuildOptions = {},
 ): Promise<RenderedEmail> {
+  const ai = options.ai ?? null;
+  // The model paragraph and the medicine note are optional and time-boxed: they start now and run beside the
+  // data reads. Neither ever rejects, so a failed read below leaves nothing dangling.
+  const summaryPromise: Promise<EmailSummary | null> = ai ? ai.dailySummary(patientId, now).catch(() => null) : Promise.resolve(null);
+  const medicinePromise = (async () => {
+    const patterns = await readPatterns(patientId, now, PATTERN_DAYS.daily);
+    return { patterns, note: await medicineNoteFor(patientId, patterns, ai) };
+  })();
+
   const s = await loadDaySnapshot(patientId, now);
 
   const alerts: EmailAlert[] = [];
@@ -338,25 +472,38 @@ export async function buildDailyReportEmail(
     if (a) alerts.push(a);
   }
 
-  // 7-day BP pattern alerts already produced for the in-app Alert Center. They are
+  // 7-day BP pattern alerts and the medicine alerts already produced for the in-app Alert Center. They are
   // a bonus on top of today's own checks, so a failure here must not sink the report.
-  if (isAlertEnabled(s.settings, "bp")) {
-    try {
-      const insights = await generateSmartInsightsAndAlerts(patientId);
-      for (const a of insights.alerts.filter((x) => x.category === "bp" && x.severity !== "INFO")) {
-        alerts.push({
-          severity: a.severity,
-          titleHi: a.titleHi,
-          titleEn: a.title,
-          messageHi: a.messageHi,
-          messageEn: a.message,
-          path: a.actionUrl,
-        });
-      }
-    } catch (err) {
-      console.warn("[email] skipped BP pattern alerts:", err instanceof Error ? err.message : err);
-    }
+  const wantBp = isAlertEnabled(s.settings, "bp");
+  const wantMedicine = isAlertEnabled(s.settings, "medicine") && medicinePatternsOn();
+  const inAppPromise =
+    wantBp || wantMedicine
+      ? generateSmartInsightsAndAlerts(patientId).catch((err: unknown) => {
+          console.warn("[email] skipped pattern alerts:", err instanceof Error ? err.message : err);
+          return null;
+        })
+      : Promise.resolve(null);
+
+  const [{ patterns, note }, inApp, summary] = await Promise.all([medicinePromise, inAppPromise, summaryPromise]);
+  const medicineInsight: EmailAlert | undefined =
+    note && patterns && wantMedicine ? medicineInsightAlert(note, insightSeverity(emailPatternReport(patterns.report), patterns.bp)) : undefined;
+
+  // A medicine row's own pattern alert is left out when the note already says it.
+  for (const a of inApp?.alerts ?? []) {
+    if (a.severity === "INFO") continue;
+    const wanted = a.category === "bp" ? wantBp : a.category === "medicine" ? wantMedicine && !(medicineInsight && PATTERN_ALERT_KEY.test(a.key)) : false;
+    if (!wanted) continue;
+    alerts.push({
+      severity: a.severity,
+      titleHi: a.titleHi,
+      titleEn: a.title,
+      messageHi: a.messageHi,
+      messageEn: a.message,
+      path: a.actionUrl,
+    });
   }
+
+  const aiAssisted = summary !== null || (medicineInsight !== undefined && note?.source === "ai");
 
   return renderDailyReport({
     patientName: s.patientName,
@@ -379,6 +526,9 @@ export async function buildDailyReportEmail(
     sleepHours: s.sleepHours,
     weightKg: s.weightKg,
     notLogged: dueGaps(s, istMinutesOfDay(now)),
+    ...(summary ? { summary } : {}),
+    ...(medicineInsight ? { medicineInsight } : {}),
+    ...(aiAssisted ? { aiAssisted } : {}),
   });
 }
 
@@ -403,28 +553,69 @@ async function bpRangeStats(
   };
 }
 
+/**
+ * The model's trend note and the medicine paragraph of a periodic report, both optional and started before
+ * the report's own reads so they run beside them. Never rejects.
+ */
+function periodicBlocks(patientId: string, now: Date, view: "weekly" | "monthly", ai: EmailAi | null) {
+  const narrative: Promise<EmailNarrative | null> = ai ? ai.trendNarrative(patientId, view).catch(() => null) : Promise.resolve(null);
+  const medicine = (async (): Promise<{ coach: EmailMedicineCoach | null; ai: boolean }> => {
+    const read = await readPatterns(patientId, now, PATTERN_DAYS[view]);
+    const note = await medicineNoteFor(patientId, read, ai);
+    if (!note || !read) return { coach: null, ai: false };
+    const forMail = emailPatternReport(read.report);
+    return { coach: medicineCoachFrom(note, forMail, pickNudges(forMail)), ai: note.source === "ai" };
+  })();
+  return { narrative, medicine };
+}
+
 export async function buildWeeklyReportEmail(
   patientId: string,
   now: Date = new Date(),
+  options: EmailBuildOptions = {},
 ): Promise<RenderedEmail> {
+  const blocks = periodicBlocks(patientId, now, "weekly", options.ai ?? null);
   const [summary, profile, settings] = await Promise.all([
     getWeeklyReportData(patientId, toISTDate(now)),
     getPatientProfile(patientId),
     getPatientSettingsOrDefault(patientId),
   ]);
   const bp = await bpRangeStats(patientId, summary.startDate, summary.endDate, settings.bp_targets);
-  return renderWeeklyReport({ patientName: profile.name, summary, ...bp });
+  const [narrative, medicine] = await Promise.all([blocks.narrative, blocks.medicine]);
+  const aiAssisted = narrative !== null || medicine.ai;
+  return renderWeeklyReport({
+    patientName: profile.name,
+    summary,
+    ...bp,
+    ...(narrative ? { narrative } : {}),
+    ...(medicine.coach ? { medicineCoach: medicine.coach } : {}),
+    ...(aiAssisted ? { aiAssisted } : {}),
+  });
 }
 
 /** Rolling last-30-days report; the month cron sends it on the 1st. */
-export async function buildMonthlyReportEmail(patientId: string): Promise<RenderedEmail> {
+export async function buildMonthlyReportEmail(
+  patientId: string,
+  now: Date = new Date(),
+  options: EmailBuildOptions = {},
+): Promise<RenderedEmail> {
+  const blocks = periodicBlocks(patientId, now, "monthly", options.ai ?? null);
   const [summary, profile, settings] = await Promise.all([
     getMonthlyReportData(patientId),
     getPatientProfile(patientId),
     getPatientSettingsOrDefault(patientId),
   ]);
   const bp = await bpRangeStats(patientId, summary.startDate, summary.endDate, settings.bp_targets);
-  return renderMonthlyReport({ patientName: profile.name, summary, ...bp });
+  const [narrative, medicine] = await Promise.all([blocks.narrative, blocks.medicine]);
+  const aiAssisted = narrative !== null || medicine.ai;
+  return renderMonthlyReport({
+    patientName: profile.name,
+    summary,
+    ...bp,
+    ...(narrative ? { narrative } : {}),
+    ...(medicine.coach ? { medicineCoach: medicine.coach } : {}),
+    ...(aiAssisted ? { aiAssisted } : {}),
+  });
 }
 
 export type BpAlertOutcome =
@@ -472,6 +663,14 @@ export async function buildBpAlertEmail(
       isAlertWorthy(classifyBP(b.systolic, b.diastolic, t)),
   ).length;
 
+  // Did the BP medicine get recorded these last days? A count from the records, no model, and never a reason
+  // to hold the alert back: any problem reading it just leaves the row out.
+  let doseContext: DoseContext | null = null;
+  if (isAlertEnabled(settings, "medicine")) {
+    const read = await readPatterns(patientId, now, PATTERN_DAYS.weekly);
+    doseContext = doseContextOf(read?.bp);
+  }
+
   return {
     tone: bpTone(c),
     email: renderBpAlertEmail({
@@ -482,6 +681,7 @@ export async function buildBpAlertEmail(
       slot: data.reading_type === "Morning" ? "morning" : data.reading_type === "Evening" ? "evening" : null,
       timeLabel: istTime(data.measured_at),
       outOfRange7d,
+      ...(doseContext ? { doseContext } : {}),
     }),
   };
 }

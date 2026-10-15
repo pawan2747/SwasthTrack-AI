@@ -20,6 +20,7 @@ import {
   UserCheck,
   Utensils,
 } from "lucide-react";
+import { TrendNarrativeCard } from "@/components/ai/trend-narrative-card";
 import { NoPatientState } from "@/components/health/no-patient-state";
 import { isNoPatientError, loadErrorMessage, useAsyncData } from "@/components/health/use-async-data";
 import { fmtDateStr, fmtDateStrYear } from "@/components/health/format";
@@ -273,6 +274,14 @@ export default function HealthChangesPage() {
                 })}
               </ul>
             ) : null}
+
+            {/* Only the latest comparison is narrated; an earlier period, too little data or an urgent alert shows nothing. */}
+            <TrendNarrativeCard
+              patientId={activePatientId}
+              query={{ view: "changes", period, ...(atLatest ? {} : { endDate }) }}
+              variant="inline"
+              enabled={atLatest && !noReference}
+            />
 
             {noReference ? (
               <p lang="hi" className="text-xs text-ink-muted">

@@ -37,7 +37,7 @@ export function LearnedPhotosCard({ patientId, canWrite }: { patientId: string; 
 
   const list = examples.data ?? [];
   return (
-    <SettingsCard icon={Camera} tone="food" title="खाने की सीखी हुई फोटो (Learned meal photos)" description="जो थालियाँ फोटो से दर्ज की गईं, ऐप उन्हें याद रखता है और अगली बार तुरंत पहचानता है। फोटो नहीं, सिर्फ़ एक छोटा थंबनेल और खाने की सूची रखी जाती है।">
+    <SettingsCard icon={Camera} tone="food" title="खाने की सीखी हुई फोटो (Learned meal photos)" description="जो थालियाँ फोटो से दर्ज की गईं, ऐप उन्हें याद रखता है और अगली बार तुरंत पहचानता है। पूरी फोटो नहीं रखी जाती: सिर्फ़ एक छोटा थंबनेल, फोटो का अंकों वाला निशान (fingerprint) और खाने की सूची रखी जाती है। नीचे से हर एक हटा सकते हैं।">
       {examples.loading ? (
         <p lang="hi" className="text-sm text-ink-muted">
           लोड हो रहा है…

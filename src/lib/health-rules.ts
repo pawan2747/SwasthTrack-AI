@@ -607,3 +607,80 @@ export const FOOD_LOG_DAYS_CHANGE_PCT = 20;
 /** Resting pulse beyond these is flagged as important rather than just "attention" (bpm). */
 export const PULSE_EXTREME_HIGH = 120;
 export const PULSE_EXTREME_LOW = 40;
+
+// ---------------------------------------------------------------------------
+// Medicine patterns (append-only block: the dose-pattern engine, its alerts and notes)
+//
+// Read by src/lib/analytics/medicine-patterns-calc.ts, the medicine rules in
+// anomaly-calc.ts, the caregiver brief, the Medicines page card and the
+// model-phrased note (src/lib/ai/tasks/medicine-text.ts). Nothing here is a
+// diagnosis: it decides when a repeated gap in the dose RECORD is worth pointing
+// at. "Not recorded" is never "not taken".
+// ---------------------------------------------------------------------------
+
+/** Days of dose history behind each medicine's counts (the Medicines page card also offers 7 and 30). */
+export const PATTERN_WINDOW_DAYS = 14;
+/** Settled doses a medicine needs inside the window before anything is called a pattern. */
+export const PATTERN_MIN_DUE = 4;
+/** Missed or not-recorded doses inside the window that make a pattern. */
+export const PATTERN_MIN_MISSES = 2;
+/** A weekday needs at least this many occurrences ... */
+export const PATTERN_WEEKDAY_MIN_OCCURRENCES = 3;
+/** ... and at least this share of them missed/not recorded (2 of 3 = 0.667 is NOT enough) to be called a peak. */
+export const PATTERN_WEEKDAY_SHARE = 0.67;
+/**
+ * A weekday only occurs 3+ times over a window of 3+ weeks, so the weekday check looks this far back
+ * whatever headline window is shown. Callers that hand in fewer days simply get no weekday peaks.
+ */
+export const PATTERN_WEEKDAY_WINDOW_DAYS = 28;
+/** A weekday is not a "peak" when the medicine is missed on at least this share of ALL days (every day is bad then). */
+export const PATTERN_WEEKDAY_MAX_OVERALL_SHARE = 0.5;
+/** Consecutive missed doses at which a warning is repeated (a daily job says it once per milestone, not every day). */
+export const ESCALATION_STREAKS = [2, 4, 7] as const;
+/** Whole days with nothing recorded for any dose from this many days the pattern view names a recording gap. */
+export const MEDICINE_ENTRY_GAP_DAYS = 2;
+/**
+ * A "recording gap" day needs this many settled doses, ALL without an entry. One lone dose cannot be told
+ * apart from forgetting that one medicine, so it stays a medicine pattern.
+ */
+export const PATTERN_GAP_DAY_MIN_DOSES = 2;
+/** Important tier (counts only): this many missed doses in a row, or this many missed inside the last 7 days. */
+export const PATTERN_IMPORTANT_STREAK = 2;
+export const PATTERN_IMPORTANT_MISSES_7D = 3;
+/** Alerts one medicine rule may raise at once, so one problem cannot fill the Alert Center. */
+export const PATTERN_MAX_ALERTS = 2;
+/** Medicines a model-written note may describe (the rest stays in the on-screen list). */
+export const PATTERN_NOTE_MAX_ITEMS = 3;
+/** Medicines the Medicines page card lists one by one (the rest is a count). */
+export const PATTERN_CARD_MAX_ITEMS = 5;
+/** The widest look-back the dose-pattern engine accepts (a caller cannot ask for more history than is read). */
+export const PATTERN_MAX_WINDOW_DAYS = 90;
+/** The look-backs the Medicines page card offers (headline counts; the weekday look-back stays PATTERN_WEEKDAY_WINDOW_DAYS). */
+export const PATTERN_CARD_WINDOWS = [7, 14, 30] as const;
+
+/**
+ * How much a missed dose matters when ranking, by what the medicine is for (src/lib/medicine-classes.ts maps
+ * names to these classes). 3 = the ones a missed day can hurt. It only ranks and words: it never decides
+ * that a dose was taken or not.
+ */
+export const MEDICINE_CLASS_WEIGHTS = {
+  bp: 3,
+  heart: 3,
+  diabetes: 3,
+  blood_thinner: 3,
+  cholesterol: 2,
+  thyroid: 2,
+  diuretic: 2,
+  other: 1,
+} as const;
+/** From this weight a missed dose is its own line in the caregiver brief and lifts the missed-dose cluster one step. */
+export const CRITICAL_MEDICINE_WEIGHT = 3;
+
+/** BP medicine + high readings: look at this many IST days (today included) ... */
+export const BP_MED_GAP_DAYS = 3;
+/** ... this many distinct (BP medicine, date) doses missed or not recorded ... */
+export const BP_MED_GAP_MIN_MISSED = 2;
+/** ... and this many plausible readings at/above the patient's target (or any reading at/above the alert line). */
+export const BP_MED_GAP_MIN_ABOVE_TARGET = 2;
+/** Ranking bonus for a BP medicine whose misses fall in the same days as readings above target. */
+export const BP_MED_CONTEXT_SCORE_BONUS = 5;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CalendarRange, Pill, Scale, Sparkles } from "lucide-react";
+import { TrendNarrativeCard } from "@/components/ai/trend-narrative-card";
 import { ErrorState } from "@/components/ui/page";
 import { loadErrorMessage, useAsyncData } from "@/components/health/use-async-data";
 import { TrendChart } from "@/components/reports/lazy-charts";
@@ -222,6 +223,8 @@ export function YearlyReportView({ patientId }: YearlyReportViewProps) {
           </table>
         </div>
       </ChartCard>
+
+      <TrendNarrativeCard patientId={patientId} query={{ view: "yearly", year }} enabled={year === thisYear && data.hasSufficientData} />
 
       <InsightList title="Year observations" hindiTitle="साल की बातें" items={data.personalizedInsights} />
 

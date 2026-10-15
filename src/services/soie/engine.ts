@@ -12,7 +12,9 @@
 import { runAgent, type AgentResult, type Effort, type LlmClient } from "./agent";
 import { finalizeAnswer, notice } from "./answer";
 import { answerWithRules } from "./fallback";
+import { runJsonAgent } from "./json-agent";
 import { buildLedger, dataPointCount } from "./ledger";
+import { scrubContext, scrubHistory, type Redactor } from "./privacy";
 import type { HistoryTurn } from "./prompt";
 import { assessSafety, buildEmergencyAnswer } from "./safety";
 import type { ToolDeps } from "./tools";
@@ -20,8 +22,11 @@ import type { Notice, PatientContext, ProgressEvent, SoieAnswer, TraceStep, Turn
 
 export type EventStatus = "success" | "refused" | "emergency" | "no_data" | "validation_failed" | "fallback" | "error" | "rate_limited";
 
+/** Asked once, right before a model would be called (never for an emergency): may it be, and is there budget? */
+export type GateDecision = { allow: true } | { allow: false; notice: Notice };
+
 export interface TurnConfig {
-  /** null = no API key: the rules engine answers and says so. */
+  /** null = no model for this turn: the rules engine answers and says so (see `unavailable`). */
   client: LlmClient | null;
   model: string;
   effort: Effort;
@@ -31,6 +36,22 @@ export interface TurnConfig {
   signal?: AbortSignal;
   deadlineMs?: number;
   now?: Date;
+  /**
+   * How the model gets its evidence. `tools` (default): the model reads the data with tools in a loop (needed
+   * for a provider that searches the web). `json`: code plans the evidence, one structured call, verified
+   * (small enough for a free tier; no web search).
+   */
+  channel?: "tools" | "json";
+  /** Offer the app's curated guideline list (a tool in the tool channel, GUIDELINES in the JSON pack). */
+  guidelines?: boolean;
+  /** Removes names and contacts from everything model-bound; the user-facing answer keeps the original text. */
+  redact?: Redactor;
+  /** The names the verifier must treat as the patient's own medicines when `redact` changed the context. */
+  medicineNames?: string[];
+  /** Why there is no client (default: AI is not switched on). */
+  unavailable?: Notice;
+  /** Consent and budget checks, run lazily just before a model call. */
+  gate?: () => Promise<GateDecision>;
 }
 
 export interface TurnInput {
@@ -85,32 +106,52 @@ export async function runTurn(input: TurnInput, cfg: TurnConfig): Promise<TurnRe
     return { answer, status: noData && status === "fallback" ? "no_data" : status, intent: r.intent, telemetry: { ...base, intent: r.intent, dataPoints: base.dataPoints || dataPointCount(ctx) }, trace: [...trace, ...(agent?.trace ?? [])], agent, privacyFlags: agent?.privacyFlags ?? 0 };
   };
 
-  // 2. No API key: rules engine, said out loud.
+  // 2. No model for this turn (not switched on, or the family has not agreed, or no budget): rules engine, said out loud.
   if (!cfg.client) {
-    for (const n of [notice("no_api_key")]) emit({ type: "notice", notice: n });
-    return rules([notice("no_api_key")], "fallback", null);
+    const n = cfg.unavailable ?? notice("no_api_key");
+    emit({ type: "notice", notice: n });
+    return rules([n], "fallback", null);
   }
 
-  // 3. AI agent.
-  const agent = await runAgent({
+  // 3. Consent and budget, asked only now that a model WOULD be called.
+  if (cfg.gate) {
+    const decision = await cfg.gate();
+    if (!decision.allow) {
+      emit({ type: "notice", notice: decision.notice });
+      return rules([decision.notice], "fallback", null);
+    }
+  }
+
+  // 4. AI agent. What the model sees is a scrubbed copy; the verifier checks numbers (identical in both copies).
+  const redact = cfg.redact;
+  const modelCtx = redact ? scrubContext(ctx, redact) : ctx;
+  const modelMessage = redact ? redact(safety.sanitized) : safety.sanitized;
+  const modelHistory = redact ? scrubHistory(input.history, redact) : input.history;
+  const agentOptions = {
     client: cfg.client,
     model: cfg.model,
     effort: cfg.effort,
-    ctx,
+    ctx: modelCtx,
     ledger,
     safety,
-    message: safety.sanitized,
-    history: input.history,
+    message: modelMessage,
+    history: modelHistory,
+    planMessage: safety.sanitized,
+    planHistory: input.history,
     webSearch: cfg.webSearch,
+    guidelines: cfg.guidelines,
+    medicineNames: Array.from(new Set([...(cfg.medicineNames ?? []), ...ctx.medicines.map((m) => m.name), ...modelCtx.medicines.map((m) => m.name)])),
     canWrite: input.canWrite,
     deps: cfg.deps,
     emit,
     signal: cfg.signal,
     deadlineMs: cfg.deadlineMs,
-  });
+  };
+  const agent = cfg.channel === "json" ? await runJsonAgent(agentOptions) : await runAgent(agentOptions);
 
   if (agent.draft) {
-    const notices: Notice[] = cfg.webSearch ? [] : [notice("web_search_off")];
+    // The JSON channel never searches, by design: its notice would only be noise next to a curated source.
+    const notices: Notice[] = cfg.webSearch || cfg.channel === "json" ? [] : [notice("web_search_off")];
     const answer = finalizeAnswer(agent.draft, { ...common, engine: "ai", model: agent.model, webSearchUsed: agent.webSearchUsed, validation: agent.validation ?? "passed", notices, toolEvidence: agent.toolEvidence });
     const refused = answer.refusal.trim().length > 0;
     return { answer, status: refused ? "refused" : noData ? "no_data" : "success", intent: "ai", telemetry: { ...agent.telemetry, intent: "ai" }, trace: [...trace, ...agent.trace], agent, privacyFlags: agent.privacyFlags };

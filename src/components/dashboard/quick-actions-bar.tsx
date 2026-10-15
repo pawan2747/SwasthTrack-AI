@@ -1,8 +1,10 @@
 "use client";
 
+import { useRef, useState } from "react";
 import {
   Footprints,
   HeartPulse,
+  Mic,
   Moon,
   Pill,
   PlusCircle,
@@ -13,6 +15,8 @@ import type { LucideIcon } from "lucide-react";
 import { Card, metricChipClasses, type MetricTone } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pressable, Reveal, Stagger } from "@/components/motion/primitives";
+import { VoiceLogDialog } from "@/components/voicelog/voice-log-dialog";
+import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 
 type QuickActionsBarProps = {
@@ -22,6 +26,12 @@ type QuickActionsBarProps = {
   onOpenActivity: () => void;
   onOpenSleep: () => void;
   onOpenMedicine: () => void;
+  /**
+   * Called once after the "बोलकर दर्ज करें" sheet saved (or removed) something, so the page can refresh
+   * its numbers (pass the same function the other dialogs get as onSuccess). Without it the page is
+   * reloaded when the sheet closes after a save, so the cards never show stale figures.
+   */
+  onVoiceSaved?: () => void;
 };
 
 type QuickAction = {
@@ -60,7 +70,11 @@ export function QuickActionsBar({
   onOpenActivity,
   onOpenSleep,
   onOpenMedicine,
+  onVoiceSaved,
 }: QuickActionsBarProps) {
+  const { activePatientId, canWrite } = useAuth();
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const savedRef = useRef(false);
   const actions: QuickAction[] = [
     { label: "BP", hindiLabel: "रक्तचाप", hint: "ऊपर / नीचे वाला", icon: HeartPulse, tone: "bp", onClick: onOpenBP },
     { label: "Weight", hindiLabel: "वजन", hint: "kg में मापें", icon: Scale, tone: "weight", onClick: onOpenWeight },
@@ -84,6 +98,26 @@ export function QuickActionsBar({
         </h2>
         <Badge variant="gold">Quick Log · 1 टैप</Badge>
       </div>
+
+      {canWrite && activePatientId ? (
+        <Pressable
+          onClick={() => setVoiceOpen(true)}
+          ariaLabel="बोलकर दर्ज करें: BP, वजन, नींद, कदम और दवाई एक साथ"
+          className="tile group mb-2 flex min-h-control w-full items-center gap-3 rounded-card px-3 py-2.5 text-left transition-shadow duration-200 hover:shadow-glow-brand sm:mb-2.5"
+        >
+          <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-control shadow-e1", metricChipClasses.brand)}>
+            <Mic aria-hidden className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span lang="hi" className="block truncate text-sm font-semibold leading-tight text-ink">
+              बोलकर दर्ज करें
+            </span>
+            <span lang="hi" className="mt-0.5 block text-2xs text-ink-muted">
+              एक वाक्य में BP, वजन, नींद, कदम, दवाई
+            </span>
+          </span>
+        </Pressable>
+      ) : null}
 
       <Stagger className="@container grid grid-cols-3 gap-2 sm:gap-2.5 @2xl:grid-cols-6">
         {actions.map((action, i) => {
@@ -121,6 +155,26 @@ export function QuickActionsBar({
           );
         })}
       </Stagger>
+
+      {activePatientId ? (
+        <VoiceLogDialog
+          isOpen={voiceOpen}
+          patientId={activePatientId}
+          onSaved={() => {
+            savedRef.current = true;
+            onVoiceSaved?.();
+          }}
+          onClose={() => {
+            setVoiceOpen(false);
+            // Nobody gave this bar a way to refresh the page: reload it once, so the new figures show.
+            if (savedRef.current && !onVoiceSaved) {
+              savedRef.current = false;
+              window.location.reload();
+            }
+            savedRef.current = false;
+          }}
+        />
+      ) : null}
     </Card>
   );
 }

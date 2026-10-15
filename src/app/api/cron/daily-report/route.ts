@@ -5,5 +5,5 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export function GET(request: Request) {
-  return runCron(request, (patientId) => buildDailyReportEmail(patientId));
+  return runCron(request, (patientId, { now, ai }) => buildDailyReportEmail(patientId, now, { ai }));
 }

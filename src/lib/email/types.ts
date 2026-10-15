@@ -33,6 +33,47 @@ export interface RenderOptions {
   recipient?: string;
 }
 
+// ---- optional blocks (everything below is additive: absent = the mail is exactly what it was) --------------
+
+/**
+ * A short model-written paragraph that has already passed the checks in src/lib/ai/narrative-verify.ts
+ * (numbers came from code, nothing advises on a dose, nothing reassures beside an alert). Hindi with its
+ * English twin; `headline` is the model's own one-line title for it, when it wrote one.
+ */
+export interface EmailSummary {
+  headline: Bi | null;
+  body: Bi;
+}
+
+/** A verified trend note: one headline and a few points, each Hindi + English. */
+export interface EmailNarrative {
+  headline: Bi;
+  points: Bi[];
+}
+
+/**
+ * The medicine paragraph of a weekly / monthly report: the pattern note (model-phrased or code-made),
+ * the fixed "record it" / "ask the doctor or pharmacist" lines and fixed questions to take to the doctor.
+ * `ai` is true only when the sentence itself was phrased by a model.
+ */
+export interface EmailMedicineCoach {
+  hi: string;
+  en: string;
+  nudges: Bi[];
+  doctorQuestions: Bi[];
+  ai?: boolean;
+}
+
+/** Doses of the patient's BP medicine in the last days, so a high-BP alert can say whether they were recorded. */
+export interface DoseContext {
+  /** The look-back in days (today included). */
+  days: number;
+  /** Settled doses of BP-class medicines in those days. */
+  due: number;
+  /** Of those, recorded as taken (on time or late). The rest were marked missed or have no entry. */
+  adherent: number;
+}
+
 // ---- alerts -----------------------------------------------------------------
 
 export interface BpAlertData {
@@ -47,6 +88,8 @@ export interface BpAlertData {
   timeLabel: string;
   /** Readings outside the range in the last 7 days, this one included. */
   outOfRange7d: number;
+  /** One more row under the 7-day count: how many BP-medicine doses were recorded in the last days. */
+  doseContext?: DoseContext;
 }
 
 export interface ReminderData {
@@ -58,6 +101,12 @@ export interface ReminderData {
   missingRecords: Bi[];
   /** Whole days since anything was logged; null when not a concern. */
   daysWithoutData: number | null;
+  /** Yesterday's doses nobody recorded (or somebody marked missed), at any time of day. Same shape as `missedMedicines`. */
+  yesterdayMissed?: { name: string; sub: string }[];
+  /** The medicine pattern note, drawn like an alert. Its wording is code-made or a verified model phrasing. */
+  medicineInsight?: EmailAlert;
+  /** True when any sentence of the mail was phrased by a model: the footer then says so. */
+  aiAssisted?: boolean;
 }
 
 export interface WeightAlertData {
@@ -91,6 +140,12 @@ export interface DailyReportData {
   sleepHours: number | null;
   weightKg: number | null;
   notLogged: Bi[];
+  /** The model-written paragraph of the day ("आज का सार"), verified. */
+  summary?: EmailSummary;
+  /** The medicine pattern note, drawn like an alert in the "needs attention" block. */
+  medicineInsight?: EmailAlert;
+  /** True when any sentence of the mail was phrased by a model: the footer then says so. */
+  aiAssisted?: boolean;
 }
 
 export interface WeeklyReportData {
@@ -98,6 +153,10 @@ export interface WeeklyReportData {
   summary: WeeklyReportSummary;
   bpAverage: { systolic: number; diastolic: number } | null;
   bpAlertCount: number;
+  /** The verified trend note of the week. */
+  narrative?: EmailNarrative;
+  medicineCoach?: EmailMedicineCoach;
+  aiAssisted?: boolean;
 }
 
 export interface MonthlyReportData {
@@ -105,6 +164,10 @@ export interface MonthlyReportData {
   summary: MonthlyReportSummary;
   bpAverage: { systolic: number; diastolic: number } | null;
   bpAlertCount: number;
+  /** The verified trend note of the month. */
+  narrative?: EmailNarrative;
+  medicineCoach?: EmailMedicineCoach;
+  aiAssisted?: boolean;
 }
 
 // ---- account / caregiver ----------------------------------------------------

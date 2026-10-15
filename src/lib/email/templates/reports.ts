@@ -27,6 +27,9 @@ import {
 import type {
   BpTone,
   DailyReportData,
+  EmailMedicineCoach,
+  EmailNarrative,
+  EmailSummary,
   MonthlyReportData,
   RenderOptions,
   RenderedEmail,
@@ -65,6 +68,49 @@ function notice(hiText: string, enText: string): string {
   return noteBox("warn", hi(hiText, { size: 12, lh: 19 }) + en(enText, { size: 11.5, lh: 16, color: C.muted, mt: 1 }), "10px 12px");
 }
 
+// ---- model-written blocks (all optional: absent means the mail is exactly what it was) -------------------------
+
+/** Small label next to a model-written block, so the reader knows which words a model chose. */
+const aiPill = (): string => pill("ok", "AI की मदद से · AI-assisted", 10);
+
+/** "आज का सार": the verified paragraph of the day. */
+function summaryBlock(s: EmailSummary): string {
+  return section(
+    heading({ hi: "आज का सार", en: "Today in short" }, aiPill()) +
+      (s.headline
+        ? hi(s.headline.hi, { size: 13.5, lh: 21, weight: 700 }) + en(s.headline.en, { size: 11.5, lh: 16, weight: 600, color: C.muted, mt: 1 })
+        : "") +
+      hi(s.body.hi, { size: 13, lh: 21, mt: s.headline ? 6 : 0 }) +
+      en(s.body.en, { size: 12, lh: 17, color: C.muted, mt: 2 }),
+  );
+}
+
+/** The verified trend note of a week or a month: a headline and its points. */
+function narrativeBlock(n: EmailNarrative, h: Bi): string {
+  return section(
+    heading(h, aiPill()) +
+      hi(n.headline.hi, { size: 13.5, lh: 21, weight: 700 }) +
+      en(n.headline.en, { size: 11.5, lh: 16, weight: 600, color: C.muted, mt: 1 }) +
+      (n.points.length > 0 ? spacer(6) + bulletRows(n.points.map((p) => ({ hi: p.hi, en: p.en }))) : ""),
+  );
+}
+
+/** The medicine pattern of the period: the note, the fixed lines after it, and fixed questions for the doctor. */
+function coachBlock(c: EmailMedicineCoach): string {
+  return section(
+    heading({ hi: "दवाइयों का पैटर्न", en: "Medicine pattern" }, c.ai ? aiPill() : undefined) +
+      hi(c.hi, { size: 12.5, lh: 20 }) +
+      en(c.en, { size: 11.5, lh: 16, color: C.muted, mt: 1 }) +
+      c.nudges.map((n) => hi(n.hi, { size: 11.5, lh: 18, mt: 6 }) + en(n.en, { size: 11, lh: 15, color: C.muted, mt: 1 })).join("") +
+      (c.doctorQuestions.length > 0
+        ? hi("डॉक्टर या फार्मासिस्ट से पूछने के लिए", { size: 11.5, lh: 17, weight: 700, mt: 10 }) +
+          en("To ask the doctor or pharmacist", { size: 10.5, lh: 14, weight: 600, color: C.subtle, mt: 1 }) +
+          spacer(4) +
+          bulletRows(c.doctorQuestions.map((q) => ({ hi: q.hi, en: q.en })))
+        : ""),
+  );
+}
+
 // ---- daily ------------------------------------------------------------------
 
 function bpRows(rows: DailyReportData["bpReadings"]): string {
@@ -91,10 +137,13 @@ export function renderDailyReport(d: DailyReportData, opts: RenderOptions = {}):
       { first: true },
     ),
   ];
+  if (d.summary) sections.push(summaryBlock(d.summary));
 
-  if (d.alerts.length > 0) {
+  // The medicine pattern note is drawn like the alerts, after them.
+  const callouts = d.medicineInsight ? [...d.alerts, d.medicineInsight] : d.alerts;
+  if (callouts.length > 0) {
     sections.push(
-      section(heading({ hi: "ध्यान देने वाली बातें", en: "Needs attention" }) + d.alerts.map((a) => alertCallout(a) + spacer(8)).join(""), {
+      section(heading({ hi: "ध्यान देने वाली बातें", en: "Needs attention" }) + callouts.map((a) => alertCallout(a) + spacer(8)).join(""), {
         pad: "14px 22px 8px",
       }),
     );
@@ -145,13 +194,15 @@ export function renderDailyReport(d: DailyReportData, opts: RenderOptions = {}):
   }
   sections.push(ctaSection(base, "/", { hi: "पूरी रिपोर्ट देखें", en: "Open full report" }));
 
-  const flagged = d.alerts.some((a) => a.severity === "IMPORTANT");
+  // Subject and preheader are code-only: a count and a flag, never a model's words.
+  const flagged = callouts.some((a) => a.severity === "IMPORTANT");
   return finish({
     subject: `${flagged ? "⚠️ " : ""}SwasthTrack daily report · ${d.patientName} · ${d.date.en}`,
     title: `SwasthTrack · Daily report · ${d.patientName}`,
-    preheader: d.alerts.length
-      ? `${d.alerts.length} बातें ध्यान देने लायक · ${d.alerts.length} item(s) need attention`
+    preheader: callouts.length
+      ? `${callouts.length} बातें ध्यान देने लायक · ${callouts.length} item(s) need attention`
       : "आज का सारांश · Today's summary",
+    aiNote: d.aiAssisted === true || d.summary !== undefined,
     sections,
     reason: reportReason(
       `आपको यह रिपोर्ट रोज़ रात 9 बजे मिलती है क्योंकि आप ${d.patientName} की देखभाल से जुड़े हैं।`,
@@ -228,6 +279,7 @@ export function renderWeeklyReport(w: WeeklyReportData, opts: RenderOptions = {}
             { pad: "0 22px 14px", rule: false },
           ),
         ]),
+    ...(w.narrative ? [narrativeBlock(w.narrative, { hi: "इस हफ़्ते की कहानी", en: "The week in words" })] : []),
     section(scoreBlock({ hi: "साप्ताहिक स्कोर", en: "Weekly score" }, s.averageScore, s.daysTrackedCount, s.totalDays) + dayTiles),
     section(bpBlock(s.bpReadingsCount, w.bpAverage, w.bpAlertCount)),
     section(
@@ -241,6 +293,7 @@ export function renderWeeklyReport(w: WeeklyReportData, opts: RenderOptions = {}
           { label: { hi: "वज़न में बदलाव", en: "Weight change" }, value: weightChange },
         ]),
     ),
+    ...(w.medicineCoach ? [coachBlock(w.medicineCoach)] : []),
     insightsBlock(s.personalizedInsights),
     ctaSection(base, "/reports", { hi: "साप्ताहिक रिपोर्ट देखें", en: "Open weekly report" }),
   ];
@@ -249,6 +302,7 @@ export function renderWeeklyReport(w: WeeklyReportData, opts: RenderOptions = {}
     subject: `SwasthTrack weekly report · ${w.patientName} · ${range.en}`,
     title: `SwasthTrack · Weekly report · ${w.patientName}`,
     preheader: `औसत स्कोर ${s.averageScore}/100 · Average score ${s.averageScore}/100`,
+    aiNote: w.aiAssisted === true || w.narrative !== undefined || w.medicineCoach?.ai === true,
     sections,
     reason: reportReason(
       `आपको यह रिपोर्ट हर रविवार रात 8 बजे मिलती है क्योंकि आप ${w.patientName} की देखभाल से जुड़े हैं।`,
@@ -310,6 +364,7 @@ export function renderMonthlyReport(m: MonthlyReportData, opts: RenderOptions = 
       { first: true },
     ),
     ...notes.map((n) => section(n, { pad: "0 22px 14px", rule: false })),
+    ...(m.narrative ? [narrativeBlock(m.narrative, { hi: "इस महीने की कहानी", en: "The month in words" })] : []),
     section(scoreBlock({ hi: "मासिक स्कोर", en: "Monthly score" }, s.averageScore, s.daysTrackedCount, s.totalDays)),
     section(bpBlock(s.totalBpReadings, m.bpAverage, m.bpAlertCount)),
     section(
@@ -335,6 +390,7 @@ export function renderMonthlyReport(m: MonthlyReportData, opts: RenderOptions = 
           weightTile,
         ]),
     ),
+    ...(m.medicineCoach ? [coachBlock(m.medicineCoach)] : []),
     insightsBlock(s.personalizedInsights),
     ctaSection(base, "/reports", { hi: "मासिक रिपोर्ट देखें", en: "Open monthly report" }),
   ];
@@ -343,6 +399,7 @@ export function renderMonthlyReport(m: MonthlyReportData, opts: RenderOptions = 
     subject: `SwasthTrack monthly report · ${m.patientName} · ${range.en}`,
     title: `SwasthTrack · Monthly report · ${m.patientName}`,
     preheader: `औसत स्कोर ${s.averageScore}/100 · Average score ${s.averageScore}/100`,
+    aiNote: m.aiAssisted === true || m.narrative !== undefined || m.medicineCoach?.ai === true,
     sections,
     reason: reportReason(
       `आपको यह रिपोर्ट हर महीने की 1 तारीख को सुबह 9 बजे मिलती है क्योंकि आप ${m.patientName} की देखभाल से जुड़े हैं।`,

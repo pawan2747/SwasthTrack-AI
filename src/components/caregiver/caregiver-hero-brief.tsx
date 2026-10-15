@@ -39,7 +39,10 @@ import {
   type CaregiverMonthlyBrief,
   type CaregiverWeeklyBrief,
 } from "@/services/caregiver-intelligence-service";
+import { AiBrief } from "@/components/dashboard/ai-brief-block";
+import { TrendNarrativeCard } from "@/components/ai/trend-narrative-card";
 import { CaregiverQuickLogModal } from "./caregiver-quick-log-modal";
+import { HandoverShareButton } from "./handover-share-button";
 
 type CaregiverHeroBriefProps = {
   patientId: string;
@@ -195,6 +198,18 @@ function DailyView({
         </div>
       </div>
 
+      <AiBrief
+        patientId={brief.patientId}
+        audience="family"
+        day={isToday ? "today" : "yesterday"}
+        refreshKey={brief.cacheTimestamp}
+        onOpen={
+          canWrite
+            ? { bp: onQuickLog, medicine: onQuickLog, food: onQuickLog, sleep: onQuickLog, activity: onQuickLog, weight: onQuickLog }
+            : undefined
+        }
+      />
+
       <div className="tile space-y-1.5 rounded-card p-3">
         <ProgressBar value={brief.completenessPercent} max={100} label={`दैनिक ट्रैकिंग पूर्णता: ${brief.completenessLabelHi}`} />
         <p lang="hi" className="text-2xs text-ink-subtle">
@@ -329,7 +344,7 @@ function DailyView({
             <strong className="font-semibold text-ink">क्या बदला:</strong> {brief.whatChangedCompactHi}
           </span>
         </p>
-        <div className="no-print flex shrink-0 items-center gap-2 print:hidden">
+        <div className="no-print flex shrink-0 flex-wrap items-center gap-2 print:hidden">
           <Link href="/insights/changes" className={buttonClasses({ variant: "secondary", size: "sm" })}>
             बदलाव का विवरण
           </Link>
@@ -337,6 +352,7 @@ function DailyView({
             <History aria-hidden className="h-3.5 w-3.5" />
             स्वास्थ्य यात्रा
           </Link>
+          <HandoverShareButton patientId={brief.patientId} patientName={patientName} brief={brief} isToday={isToday} />
         </div>
       </div>
 
@@ -611,9 +627,15 @@ export function CaregiverHeroBrief({ patientId, patientName, onLogged }: Caregiv
             onQuickLog={() => setIsQuickLogOpen(true)}
           />
         ) : viewMode === "weekly" ? (
-          <WeeklyView brief={weekly.data!} patientName={patientName} />
+          <div className="space-y-4">
+            <WeeklyView brief={weekly.data!} patientName={patientName} />
+            <TrendNarrativeCard patientId={patientId} query={{ view: "weekly" }} />
+          </div>
         ) : (
-          <MonthlyView brief={monthly.data!} patientName={patientName} />
+          <div className="space-y-4">
+            <MonthlyView brief={monthly.data!} patientName={patientName} />
+            <TrendNarrativeCard patientId={patientId} query={{ view: "monthly" }} />
+          </div>
         )}
       </div>
 

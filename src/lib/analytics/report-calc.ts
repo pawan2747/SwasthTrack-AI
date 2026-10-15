@@ -13,7 +13,10 @@ import {
   bpScheduleSlots,
   classifyBP,
   isPlausibleBP,
+  median,
   round,
+  stdDev,
+  type BPClassification,
   type BPSchedule,
   type BPThresholds,
 } from "../health-rules";
@@ -238,4 +241,73 @@ export function formatRangeLabel(start: string, end: string): string {
     });
   };
   return `${f(start, false)} – ${f(end, true)}`;
+}
+
+// ---------------------------------------------------------------------------
+// One definition of "the BP readings of a period" (doctor visit view + trend facts)
+// ---------------------------------------------------------------------------
+
+/** A reading as the BP log stores it; any extra fields (id, measured_at, notes ...) ride along untouched. */
+export interface BPReadingLike {
+  systolic: number;
+  diastolic: number;
+  pulse?: number | null;
+}
+
+export interface BPReadingsSummary<T extends BPReadingLike> {
+  /** Plausible readings: every figure below is computed from these only. */
+  n: number;
+  /** Rows left out because their values are impossible (a typo or a sensor glitch). */
+  excluded: number;
+  /** Arithmetic mean (the statistic the reports and the BP panel use); null when n = 0. */
+  meanSys: number | null;
+  meanDia: number | null;
+  medianSys: number | null;
+  medianDia: number | null;
+  /** Sample standard deviation of the systolic values; null below 2 readings. */
+  sdSys: number | null;
+  /** The reading with the highest systolic (the higher diastolic breaks a tie). */
+  highest: T | null;
+  /** At or above this patient's target line. */
+  nAboveTarget: number;
+  /** At or above the alert line (the crisis range included). */
+  nAlert: number;
+  nCrisis: number;
+  nLow: number;
+  /** Every plausible reading with its classification, in input order. */
+  classified: Array<{ reading: T; classification: BPClassification }>;
+  /** What a clinician would look at: at/above the alert line, crisis range or below the low line (input order). */
+  flagged: Array<{ reading: T; classification: BPClassification }>;
+}
+
+/**
+ * Plausibility filter + classification + the usual statistics for a list of BP readings, against this
+ * patient's own lines. Pure. The doctor-visit document and the trend fact sheet both call it, so the
+ * printed table and a written summary can never disagree (the document used to compute its average,
+ * highest and flagged readings from unfiltered rows while every analytic dropped impossible ones).
+ */
+export function summarizeBPReadings<T extends BPReadingLike>(logs: readonly T[], thresholds: BPThresholds): BPReadingsSummary<T> {
+  const plausible = logs.filter((b) => isPlausibleBP(b.systolic, b.diastolic, b.pulse));
+  const classified = plausible.map((reading) => ({ reading, classification: classifyBP(reading.systolic, reading.diastolic, thresholds) }));
+  const sys = plausible.map((b) => b.systolic);
+  const dia = plausible.map((b) => b.diastolic);
+  const highest = plausible.length
+    ? plausible.reduce((a, b) => (b.systolic > a.systolic || (b.systolic === a.systolic && b.diastolic > a.diastolic) ? b : a))
+    : null;
+  return {
+    n: plausible.length,
+    excluded: logs.length - plausible.length,
+    meanSys: meanOf(sys),
+    meanDia: meanOf(dia),
+    medianSys: median(sys),
+    medianDia: median(dia),
+    sdSys: stdDev(sys),
+    highest,
+    nAboveTarget: classified.filter((x) => x.classification.aboveTarget).length,
+    nAlert: classified.filter((x) => x.classification.exceedsAlert).length,
+    nCrisis: classified.filter((x) => x.classification.category === "crisis").length,
+    nLow: classified.filter((x) => x.classification.category === "low").length,
+    classified,
+    flagged: classified.filter((x) => x.classification.exceedsAlert || x.classification.category === "crisis" || x.classification.category === "low"),
+  };
 }

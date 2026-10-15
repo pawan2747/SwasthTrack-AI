@@ -642,7 +642,19 @@ await test("SQL injection, unknown tables/columns/operators and sensitive tables
   bad(await dbA.rpc("create_patient", { p_name: "x", p_age: "1; DROP TABLE patients" }), "22P02");
   bad(await dbA.rpc("list_patient_members", { p_patient: "not-a-uuid" }), "22P02");
   const [[{ n }]] = await getPool().query("SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = DATABASE()");
-  assert.equal(n, 28, "no table may have been dropped");
+  // 28 app tables + ai_cache, ai_events, patient_ai_settings (server-only, see the next test).
+  assert.equal(n, 31, "no table may have been dropped");
+});
+
+await test("the AI layer's server-only tables cannot be reached through the query gateway", async () => {
+  for (const table of ["ai_cache", "ai_events", "patient_ai_settings"]) {
+    for (const [label, db] of [["owner", dbA], ["stranger", dbC]]) {
+      const read = await db.from(table).select("*");
+      assert.ok(read.error && read.error.code === "42P01", `${label} read of ${table} must be refused (got ${JSON.stringify(read.error)})`);
+      const write = await db.from(table).insert({ patient_id: P.id, task: "x", status: "ok" });
+      assert.ok(write.error && write.error.code === "42P01", `${label} insert into ${table} must be refused`);
+    }
+  }
 });
 
 await test("a response never exceeds 1000 rows even when asked for more", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent, type ReactNode } from "react";
-import { Activity, CheckCircle2, HeartPulse, Moon, Pill, Scale, ShieldCheck, Utensils, XCircle } from "lucide-react";
+import { Activity, Camera, CheckCircle2, HeartPulse, Mic, Moon, Pill, Scale, ShieldCheck, Utensils, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, NumberInput, Select, TextInput } from "@/components/ui/form-field";
@@ -12,6 +12,11 @@ import { useToast } from "@/components/ui/toast";
 import { bpSafetyNote, classifyReading } from "@/components/health/bp-chip";
 import { fmtTime } from "@/components/health/format";
 import { useAsyncData } from "@/components/health/use-async-data";
+import { MealTextBox } from "@/components/food/meal-text-box";
+import { VoiceLogPanel } from "@/components/voicelog/voice-log-panel";
+import { DisplayPhotoButton } from "@/components/vision/display-photo-button";
+import { FoodPhotoDialog } from "@/components/vision/food-photo-dialog";
+import { useAuth } from "@/context/auth-context";
 import { useMedicineMarking } from "@/hooks/use-medicine-marking";
 import { DOSE_STATE_LABEL } from "@/lib/medicine-format";
 import { classifyBP, isPlausibleBP, istHour, todayIST } from "@/lib/health-rules";
@@ -19,7 +24,7 @@ import { invalidateCaregiverCache } from "@/services/caregiver-intelligence-serv
 import { logActivity, logBloodPressure, logFood, logSleep, logWeight } from "@/services/patient-service";
 import { getBPThresholds } from "@/services/settings-service";
 
-type QuickLogType = "bp" | "medicine" | "food" | "steps" | "sleep" | "weight";
+type QuickLogType = "say" | "bp" | "medicine" | "food" | "steps" | "sleep" | "weight";
 
 type CaregiverQuickLogModalProps = {
   isOpen: boolean;
@@ -30,6 +35,7 @@ type CaregiverQuickLogModalProps = {
 };
 
 const TABS: SegmentedOption<QuickLogType>[] = [
+  { value: "say", label: "Say it", hindiLabel: "बोलकर", icon: Mic },
   { value: "bp", label: "BP", hindiLabel: "रक्तचाप", icon: HeartPulse },
   { value: "medicine", label: "Medicine", hindiLabel: "दवाई", icon: Pill },
   { value: "food", label: "Food", hindiLabel: "भोजन", icon: Utensils },
@@ -145,6 +151,16 @@ function BPForm({ patientId, patientName, saved }: FormProps) {
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="space-y-3">
+      <DisplayPhotoButton
+        kind="bp"
+        patientId={patientId}
+        onResult={(v) => {
+          setSystolic(String(v.systolic));
+          setDiastolic(String(v.diastolic));
+          setPulse(v.pulse === null ? "" : String(v.pulse));
+          setErrors({});
+        }}
+      />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Systolic (ऊपर वाला)" hint="mmHg" error={errors.systolic} required>
           <NumberInput
@@ -268,13 +284,25 @@ function MedicineTab({ patientId, onChange }: { patientId: string; onChange: () 
   );
 }
 
-function FoodForm({ patientId, patientName, saved }: FormProps) {
+function FoodForm({ patientId, patientName, saved: closeSheet, refreshed }: FormProps & { refreshed: () => void }) {
   const toast = useToast();
+  const { canWrite } = useAuth();
+  // A meal sentence or photo calls this after it saved something, with `{ complete }`. The sheet closes only when the
+  // whole meal is in; after a partial save the review list stays up (it says what failed and keeps the rest to retry)
+  // and only the brief behind the sheet refreshes. The typed-calories form below calls it with no argument: a
+  // complete save, as before.
+  const saved = (result?: { complete: boolean }) => {
+    if (result && !result.complete) refreshed();
+    else closeSheet();
+  };
   const [name, setName] = useState("");
   const [calories, setCalories] = useState("");
   const [meal, setMeal] = useState(defaultMealSlot);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; calories?: string }>({});
   const [saving, setSaving] = useState(false);
+  // Today, as a meal eaten now: the meal's own save resolves the instant when it is saved, like the typed form below.
+  const logDate = todayIST();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -320,29 +348,57 @@ function FoodForm({ patientId, patientName, saved }: FormProps) {
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} noValidate className="space-y-3">
-      <Field label="भोजन का नाम" error={errors.name} required>
-        <TextInput placeholder="जैसे रोटी, दाल, सब्ज़ी" value={name} onChange={(e) => setName(e.target.value)} />
+    <div className="space-y-4">
+      {/* One meal slot for all three ways of logging below. */}
+      <Field label="कौन सा भोजन">
+        <Select value={meal} onChange={(e) => setMeal(e.target.value)}>
+          {MEAL_SLOTS.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </Select>
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="कैलोरी (kcal)" hint="अंदाज़े से भी चलेगा" error={errors.calories} required>
-          <NumberInput maxLength={4} placeholder="जैसे 250" value={calories} onChange={(e) => setCalories(e.target.value)} />
-        </Field>
-        <Field label="कौन सा भोजन">
-          <Select value={meal} onChange={(e) => setMeal(e.target.value)}>
-            {MEAL_SLOTS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
+
+      {canWrite ? (
+        <>
+          <MealTextBox compact patientId={patientId} mealType={meal} logDate={logDate} onLogged={saved} />
+          <Button variant="secondary" block onClick={() => setPhotoOpen(true)}>
+            <Camera aria-hidden className="h-4 w-4" />
+            <span lang="hi">खाने की फोटो से दर्ज करें</span>
+          </Button>
+          <FoodPhotoDialog
+            isOpen={photoOpen}
+            onClose={() => setPhotoOpen(false)}
+            patientId={patientId}
+            mealType={meal}
+            logDate={logDate}
+            onLogged={saved}
+          />
+        </>
+      ) : null}
+
+      <div className="space-y-3 border-t border-line pt-3">
+        <div>
+          <p className="text-sm font-semibold text-ink">
+            <span lang="hi">सिर्फ़ कैलोरी लिखें</span>
+          </p>
+          <p className="text-xs text-ink-muted">Or just type the food and its calories</p>
+        </div>
+        <form onSubmit={(e) => void submit(e)} noValidate className="space-y-3">
+          <Field label="भोजन का नाम" error={errors.name} required>
+            <TextInput placeholder="जैसे रोटी, दाल, सब्ज़ी" value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="कैलोरी (kcal)" hint="अंदाज़े से भी चलेगा" error={errors.calories} required>
+            <NumberInput maxLength={4} placeholder="जैसे 250" value={calories} onChange={(e) => setCalories(e.target.value)} />
+          </Field>
+          <p className="text-xs text-ink-subtle">
+            <span lang="hi">पूरी जानकारी (मात्रा, तेल, प्रोटीन) के लिए Food पेज से दर्ज करें।</span>
+          </p>
+          <SubmitRow saving={saving}>भोजन सहेजें</SubmitRow>
+        </form>
       </div>
-      <p className="text-xs text-ink-subtle">
-        <span lang="hi">पूरी जानकारी (मात्रा, तेल, प्रोटीन) के लिए Food पेज से दर्ज करें।</span>
-      </p>
-      <SubmitRow saving={saving}>भोजन सहेजें</SubmitRow>
-    </form>
+    </div>
   );
 }
 
@@ -450,6 +506,14 @@ function WeightForm({ patientId, patientName, saved }: FormProps) {
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="space-y-3">
+      <DisplayPhotoButton
+        kind="weight"
+        patientId={patientId}
+        onResult={(v) => {
+          setWeight(String(v.kg));
+          setError(null);
+        }}
+      />
       <Field label="वजन (kg)" error={error ?? undefined} required>
         <NumberInput allowDecimal maxLength={5} placeholder="जैसे 78.4" value={weight} onChange={(e) => setWeight(e.target.value)} />
       </Field>
@@ -462,11 +526,16 @@ function WeightForm({ patientId, patientName, saved }: FormProps) {
 
 function QuickLogBody({ patientId, patientName, onClose, onSuccess }: Omit<CaregiverQuickLogModalProps, "isOpen">) {
   const tabsId = useId();
+  const { canWrite } = useAuth();
   const [tab, setTab] = useState<QuickLogType>("bp");
 
-  const saved = () => {
+  /** The brief behind the sheet is stale now: drop what is cached and let the page reload. */
+  const refreshed = () => {
     invalidateCaregiverCache(patientId);
     onSuccess();
+  };
+  const saved = () => {
+    refreshed();
     onClose();
   };
 
@@ -481,24 +550,35 @@ function QuickLogBody({ patientId, patientName, onClose, onSuccess }: Omit<Careg
         </p>
       </div>
 
-      <Segmented
-        mode="tabs"
-        idPrefix={tabsId}
-        options={TABS}
-        value={tab}
-        onChange={setTab}
-        ariaLabel="क्या दर्ज करना है — What to log"
-        size="sm"
-      />
+      {canWrite ? (
+        <>
+          <Segmented
+            mode="tabs"
+            idPrefix={tabsId}
+            options={TABS}
+            value={tab}
+            onChange={setTab}
+            ariaLabel="क्या दर्ज करना है — What to log"
+            size="sm"
+          />
 
-      <div role="tabpanel" id={segmentedPanelId(tabsId, tab)} aria-labelledby={segmentedTabId(tabsId, tab)}>
-        {tab === "bp" && <BPForm patientId={patientId} patientName={patientName} saved={saved} />}
-        {tab === "medicine" && <MedicineTab patientId={patientId} onChange={() => { invalidateCaregiverCache(patientId); onSuccess(); }} />}
-        {tab === "food" && <FoodForm patientId={patientId} patientName={patientName} saved={saved} />}
-        {tab === "steps" && <StepsForm patientId={patientId} patientName={patientName} saved={saved} />}
-        {tab === "sleep" && <SleepForm patientId={patientId} patientName={patientName} saved={saved} />}
-        {tab === "weight" && <WeightForm patientId={patientId} patientName={patientName} saved={saved} />}
-      </div>
+          <div role="tabpanel" id={segmentedPanelId(tabsId, tab)} aria-labelledby={segmentedTabId(tabsId, tab)}>
+            {/* The voice panel keeps the sheet open after a save: it shows what was saved (and what failed), with undo
+                and its own close button. The brief behind it refreshes at once. */}
+            {tab === "say" && <VoiceLogPanel patientId={patientId} onSaved={refreshed} onClose={onClose} />}
+            {tab === "bp" && <BPForm patientId={patientId} patientName={patientName} saved={saved} />}
+            {tab === "medicine" && <MedicineTab patientId={patientId} onChange={refreshed} />}
+            {tab === "food" && <FoodForm patientId={patientId} patientName={patientName} saved={saved} refreshed={refreshed} />}
+            {tab === "steps" && <StepsForm patientId={patientId} patientName={patientName} saved={saved} />}
+            {tab === "sleep" && <SleepForm patientId={patientId} patientName={patientName} saved={saved} />}
+            {tab === "weight" && <WeightForm patientId={patientId} patientName={patientName} saved={saved} />}
+          </div>
+        </>
+      ) : (
+        <p role="status" lang="hi" className="rounded-card border border-info-line bg-info-soft p-3 text-sm text-info">
+          आपके पास केवल देखने का एक्सेस है, इसलिए यहाँ से कुछ दर्ज नहीं हो सकता।
+        </p>
+      )}
     </div>
   );
 }

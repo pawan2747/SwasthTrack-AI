@@ -1,59 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Mic, MicOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Mic, MicOff } from "lucide-react";
+import { AiConsentDialog } from "@/components/ai/ai-consent-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/context/auth-context";
+import { useAiSettings } from "@/hooks/use-ai-settings";
 import { cn } from "@/lib/utils";
+import type { MediaConsent } from "@/services/voicelog/capture";
+import { useSpeechToText, type SttLang } from "./use-speech-to-text";
 
 /**
- * Ask by speaking. Uses the browser's own speech recognition (Web Speech API), so
- * it works where the browser offers it (Chrome / Edge / Safari, Android and iOS)
- * and the button is simply not shown elsewhere. The spoken words land in the
- * question box so they can be checked before sending: speech recognition
- * mishears, and a wrong question gets a wrong answer.
+ * Speak instead of typing. One microphone button, two ways of listening (see use-speech-to-text.ts):
  *
- * Privacy: recognition is done by the browser's speech service (for Chrome that is
- * Google's), not by this app; the audio never reaches our server.
+ *   - the browser's own speech recognition where it exists (Chrome / Edge / Safari): the words appear as
+ *     they are spoken and nothing reaches our server (the browser's own recogniser, Google's in Chrome, hears the audio);
+ *   - otherwise (Firefox, Brave, in-app browsers, an installed iPhone app) a short recording is sent to
+ *     our server and read by an AI speech service (Whisper, Gemini as the fallback). That is the family's
+ *     "photos and voice" switch: the first tap asks, and until they say yes nothing is recorded or sent.
+ *     Recordings are never stored.
+ *
+ * Either way the words land in the box so they can be checked before anything is sent or saved: speech
+ * recognition mishears, and a wrong question gets a wrong answer. The microphone is simply not shown
+ * on a device that can do neither (the keyboard's own dictation key is always there).
  */
 
-// The Web Speech API is not in every TypeScript DOM lib; declare only what is used.
-interface RecognitionAlternative {
-  transcript: string;
-}
-interface RecognitionResult {
-  readonly length: number;
-  readonly isFinal: boolean;
-  [index: number]: RecognitionAlternative;
-}
-interface RecognitionEvent {
-  readonly resultIndex: number;
-  readonly results: { readonly length: number; [index: number]: RecognitionResult };
-}
-interface Recognition {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onresult: ((e: RecognitionEvent) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-type RecognitionCtor = new () => Recognition;
-
-function recognitionCtor(): RecognitionCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
-
-export type VoiceLang = "hi-IN" | "en-IN";
+export type VoiceLang = SttLang;
 const LANG_KEY = "soie.voiceLang";
-
-const subscribeNever = () => () => {};
 
 function readLang(): VoiceLang {
   try {
@@ -64,20 +38,15 @@ function readLang(): VoiceLang {
   }
 }
 
-const ERROR_TEXT: Record<string, string> = {
-  "not-allowed": "माइक की अनुमति नहीं मिली। ब्राउज़र की सेटिंग में माइक चालू करें।",
-  "service-not-allowed": "माइक की अनुमति नहीं मिली। ब्राउज़र की सेटिंग में माइक चालू करें।",
-  "no-speech": "कुछ सुनाई नहीं दिया। माइक दबाकर साफ़ बोलिए।",
-  "audio-capture": "माइक नहीं मिला। माइक जुड़ा है या नहीं देखें।",
-  network: "आवाज़ पहचानने के लिए इंटरनेट चाहिए।",
-  "language-not-supported": "यह भाषा इस ब्राउज़र में सपोर्ट नहीं है। दूसरी भाषा चुनें।",
-};
-
 /** Joins what was already typed with what was just said. */
 function join(base: string, said: string): string {
   const b = base.trimEnd();
   const s = said.trim();
   return b && s ? `${b} ${s}` : b || s;
+}
+
+function clock(seconds: number): string {
+  return `0:${String(seconds).padStart(2, "0")}`;
 }
 
 export function VoiceInput({
@@ -86,65 +55,64 @@ export function VoiceInput({
   maxLength,
   disabled,
   className,
+  patientId: patientIdProp,
+  onDone,
 }: {
   value: string;
   onChange: (next: string) => void;
   maxLength: number;
   disabled?: boolean;
   className?: string;
+  /** The patient whose family's switches apply; the active patient when omitted. */
+  patientId?: string | null;
+  /** One utterance finished; `text` is what the box now holds. */
+  onDone?: (text: string) => void;
 }) {
   const toast = useToast();
-  // Browser-only capability: false on the server and during hydration, so both renders agree.
-  const supported = useSyncExternalStore(subscribeNever, () => recognitionCtor() !== null, () => false);
-  const [listening, setListening] = useState(false);
+  const { activePatientId } = useAuth();
+  const patientId = patientIdProp ?? activePatientId ?? null;
+  const ai = useAiSettings(patientId);
   const [lang, setLang] = useState<VoiceLang>(readLang);
-  const recRef = useRef<Recognition | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+
+  const media: MediaConsent = ai.settings === null ? "loading" : !ai.available ? "unavailable" : ai.settings.photos === true ? "on" : ai.settings.photos === null ? "unasked" : "off";
+
   const baseRef = useRef("");
   const valueRef = useRef(value);
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
 
-  useEffect(() => () => recRef.current?.abort(), []);
+  const stt = useSpeechToText({
+    lang,
+    patientId,
+    media,
+    onInterim: (said) => onChange(join(baseRef.current, said).slice(0, maxLength)),
+    onFinal: (said) => {
+      const next = join(baseRef.current, said).slice(0, maxLength);
+      onChange(next);
+      onDone?.(next);
+    },
+    onNeedConsent: () => setConsentOpen(true),
+    onNotice: (message, tone) => (tone === "info" ? toast({ title: message, tone: "info" }) : toast({ title: message, tone: "error" })),
+  });
+  const { engine, state, level, secondsLeft, start, stop, cancel } = stt;
+  const listening = state === "listening";
+  const busy = state === "starting" || state === "transcribing";
 
   // Typing or sending while it listens: stop, so the box is never overwritten by late results.
   useEffect(() => {
-    if (disabled) recRef.current?.abort();
-  }, [disabled]);
+    if (disabled) cancel();
+  }, [disabled, cancel]);
 
-  const stop = useCallback(() => recRef.current?.stop(), []);
-
-  const start = useCallback(() => {
-    const Ctor = recognitionCtor();
-    if (!Ctor || recRef.current) return;
-    const rec = new Ctor();
-    rec.lang = lang;
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.maxAlternatives = 1;
-    baseRef.current = valueRef.current;
-    rec.onresult = (e) => {
-      let said = "";
-      for (let i = 0; i < e.results.length; i++) said += e.results[i][0]?.transcript ?? "";
-      onChange(join(baseRef.current, said).slice(0, maxLength));
-    };
-    rec.onerror = (e) => {
-      // "aborted" is our own stop; everything else is worth telling the user.
-      if (e.error !== "aborted") toast({ title: ERROR_TEXT[e.error] ?? "आवाज़ पहचान में दिक्कत आई। फिर कोशिश करें।", tone: "error" });
-    };
-    rec.onend = () => {
-      recRef.current = null;
-      setListening(false);
-    };
-    recRef.current = rec;
-    try {
-      rec.start();
-      setListening(true);
-    } catch {
-      recRef.current = null;
-      setListening(false);
+  const press = useCallback(() => {
+    if (listening) {
+      stop();
+      return;
     }
-  }, [lang, maxLength, onChange, toast]);
+    baseRef.current = valueRef.current;
+    start();
+  }, [listening, start, stop]);
 
   function pickLang(next: VoiceLang) {
     setLang(next);
@@ -155,35 +123,58 @@ export function VoiceInput({
     }
   }
 
-  if (!supported) return null;
+  // No way to listen on this device, or still finding out whether the family allows it.
+  if (engine === "none") return null;
+
+  const how = engine === "server" ? "AI से सुनेगा (आवाज़ रिकॉर्ड होकर पहचानी जाती है)" : "ब्राउज़र से सुनेगा";
+  const label = listening ? "सुनना बंद करें" : busy ? "आवाज़ पहचानी जा रही है" : "बोलकर बताएँ";
 
   return (
     <div className={cn("flex shrink-0 items-center gap-1", className)}>
       <button
         type="button"
         onClick={() => pickLang(lang === "hi-IN" ? "en-IN" : "hi-IN")}
-        disabled={listening}
+        disabled={listening || busy}
         aria-label={lang === "hi-IN" ? "बोलने की भाषा: हिंदी / Hinglish। English के लिए दबाएँ" : "Speaking language: English. Tap for Hindi / Hinglish"}
         title={lang === "hi-IN" ? "बोलने की भाषा: हिंदी / Hinglish" : "Speaking language: English"}
         className="h-control min-w-control rounded-field px-2 text-2xs font-semibold text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50"
       >
         {lang === "hi-IN" ? "हिं" : "EN"}
       </button>
+      {engine === "server" && listening ? (
+        <span aria-hidden className="flex items-center gap-1 text-2xs tabular-nums text-ink-muted">
+          <span className="h-5 w-1.5 overflow-hidden rounded-full bg-surface-sunken">
+            <span className="block w-full rounded-full bg-brand" style={{ height: `${Math.round(Math.max(0.1, level) * 100)}%`, marginTop: `${100 - Math.round(Math.max(0.1, level) * 100)}%` }} />
+          </span>
+          {clock(secondsLeft)}
+        </span>
+      ) : null}
       <Button
         type="button"
         variant={listening ? "primary" : "secondary"}
-        disabled={disabled}
-        onClick={listening ? stop : start}
+        disabled={disabled || busy}
+        onClick={press}
         aria-pressed={listening}
-        aria-label={listening ? "सुनना बंद करें" : "बोलकर पूछें"}
-        title={listening ? "सुनना बंद करें" : "बोलकर पूछें (हिंदी, English या Hinglish)"}
+        aria-label={label}
+        title={`${label} (${how})`}
         className={cn("h-control w-control px-0", listening && "animate-pulse")}
       >
-        {listening ? <MicOff aria-hidden className="h-5 w-5" /> : <Mic aria-hidden className="h-5 w-5" />}
+        {busy ? <Loader2 aria-hidden className="h-5 w-5 animate-spin" /> : listening ? <MicOff aria-hidden className="h-5 w-5" /> : <Mic aria-hidden className="h-5 w-5" />}
       </Button>
       <span className="sr-only" role="status" aria-live="polite">
-        {listening ? "सुन रहा हूँ, बोलिए" : ""}
+        {listening ? "सुन रहा हूँ, बोलिए" : state === "transcribing" ? "आवाज़ पहचानी जा रही है" : ""}
       </span>
+      {patientId ? (
+        <AiConsentDialog
+          isOpen={consentOpen}
+          onClose={() => setConsentOpen(false)}
+          patientId={patientId}
+          need="photos"
+          onDecided={(granted) => {
+            if (granted) toast({ title: "अब माइक दबाकर बोलिए", tone: "info" });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

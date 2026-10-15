@@ -19,6 +19,8 @@ import {
   type BPThresholds,
   type AlertToggles,
 } from "../health-rules";
+import { MEDICINE_CLASS_LABEL, classifyMedicine, isCriticalClass, medicineNameKey, type MedicineClass } from "../medicine-classes";
+import { MEDICINE_SAFETY_LINE, NUDGES } from "../medicine-format";
 import { overduePendingDoses, type DoseRecord } from "./adherence";
 import { ageInDays } from "./dates";
 import type { AnomalyItem } from "./anomaly-calc";
@@ -98,18 +100,65 @@ export function buildAttentionItems(input: {
     });
   }
 
-  // 3. Doses: missed ones are important; unlogged ones only after their time + grace.
+  // 3. Doses. A missed dose of a medicine whose miss matters most (BP, heart, diabetes, blood thinner) is its
+  //    own item, so the brief's first three lines are the right ones; every other missed dose stays one group.
+  //    A medicine the dictionary does not know keeps the level it always had: unknown is never "less important".
   const missed = doses.filter((d) => d.status === "missed");
   if (missed.length > 0 && input.alerts.medicine) {
-    const names = [...new Set(missed.map((d) => d.name))].join(", ");
-    items.push({
-      id: "att-meds-missed",
-      level: "IMPORTANT",
-      text: `${missed.length} dose(s) missed: ${names}.`,
-      textHi: `${missed.length} खुराक छूटी है: ${names}।`,
-      detail: "अगली खुराक अपने आप दोगुनी न करें; डॉक्टर या फार्मासिस्ट से पूछें।",
-      category: "medicine",
-    });
+    const inBpGap = new Set(input.anomalies.filter((a) => a.rule === "bp_med_gap_with_high_bp").flatMap((a) => a.medicineIds ?? []));
+    const byName = new Map<string, DoseRecord[]>();
+    for (const d of missed) {
+      const key = medicineNameKey(d.name);
+      const list = byName.get(key);
+      if (list) list.push(d);
+      else byName.set(key, [d]);
+    }
+    const critical: Array<{ list: DoseRecord[]; cls: MedicineClass; first: number; inGap: boolean }> = [];
+    const rest: DoseRecord[] = [];
+    for (const list of byName.values()) {
+      const cls = classifyMedicine(list[0].name)?.class ?? null;
+      if (cls && isCriticalClass(cls)) {
+        critical.push({ list, cls, first: Math.min(...list.map((d) => d.scheduledMin)), inGap: list.some((d) => inBpGap.has(d.medicineId)) });
+      } else {
+        rest.push(...list);
+      }
+    }
+    critical.sort((a, b) => Number(b.inGap) - Number(a.inGap) || a.first - b.first || a.list[0].name.localeCompare(b.list[0].name));
+    for (const c of critical) {
+      const n = c.list.length;
+      const none = c.list.every((d) => !d.hasRealLog);
+      const all = c.list.every((d) => d.hasRealLog);
+      const name = c.list[0].name;
+      const label = MEDICINE_CLASS_LABEL[c.cls];
+      const dose = n > 1 ? `${n} doses` : "dose";
+      const verbEn = none ? "not recorded" : all ? "missed" : "missed or not recorded";
+      const doseHi = n > 1 ? `${n} खुराकें` : "खुराक";
+      const verbHi = none ? (n > 1 ? "दर्ज नहीं हुईं" : "दर्ज नहीं हुई") : all ? (n > 1 ? "छूटीं" : "छूटी") : n > 1 ? "छूटीं या दर्ज नहीं हुईं" : "छूटी या दर्ज नहीं हुई";
+      items.push({
+        id: `att-meds-missed-${c.list[0].medicineId}`,
+        level: "IMPORTANT",
+        text: `${label.en}: ${name} ${dose} ${verbEn}.`,
+        textHi: `${label.hi}: ${name} की ${doseHi} ${verbHi}।`,
+        detail: none ? `${NUDGES.tick_if_taken.hi} ${MEDICINE_SAFETY_LINE.hi}` : MEDICINE_SAFETY_LINE.hi,
+        category: "medicine",
+      });
+    }
+    if (rest.length > 0) {
+      const names = [...new Set(rest.map((d) => d.name))].join(", ");
+      // Level 1-2 medicines the dictionary DOES know are "attention"; a name it does not know keeps "important".
+      const allKnown = rest.every((d) => classifyMedicine(d.name) !== null);
+      // "Missed" only for doses somebody marked; a dose nobody wrote down is "not recorded", never "not taken".
+      const none = rest.every((d) => !d.hasRealLog);
+      const all = rest.every((d) => d.hasRealLog);
+      items.push({
+        id: "att-meds-missed",
+        level: allKnown ? "ATTENTION" : "IMPORTANT",
+        text: `${rest.length} dose(s) ${all ? "missed" : none ? "not recorded" : "missed or not recorded"}: ${names}.`,
+        textHi: `${rest.length} खुराक ${all ? "छूटी है" : none ? "दर्ज नहीं हुई" : "छूटी या दर्ज नहीं हुई"}: ${names}।`,
+        detail: none ? `${NUDGES.tick_if_taken.hi} ${MEDICINE_SAFETY_LINE.hi}` : MEDICINE_SAFETY_LINE.hi,
+        category: "medicine",
+      });
+    }
   }
   if (input.nowMinutes !== null && input.alerts.medicine) {
     const overdue = overduePendingDoses(doses, input.nowMinutes, input.today, MEDICINE_FLAG_GRACE_MIN);

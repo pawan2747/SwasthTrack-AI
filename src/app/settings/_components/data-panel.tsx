@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Download, FileJson, FileSpreadsheet, LoaderCircle, ShieldCheck } from "lucide-react";
+import { Download, FileJson, FileSpreadsheet, LoaderCircle, ScanLine, ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
+import { useAiSettings } from "@/hooks/use-ai-settings";
+import { switchView } from "@/lib/ai-panel-view";
 import { exportAllDataAsCsv, exportAllDataAsJson } from "@/services/export-data-service";
 import type { PatientProfile } from "@/services/patient-service";
 import { LearnedPhotosCard } from "@/components/vision/learned-photos-card";
@@ -20,7 +24,45 @@ const LEGAL_LINKS = [
   { href: "/medical-disclaimer", label: "Medical Disclaimer" },
 ];
 
-export function DataPanel({ patient, canWrite = false }: { patient: PatientProfile; canWrite?: boolean }) {
+const STATE_BADGE = { on: "positive", off: "neutral", unasked: "attention" } as const;
+
+/**
+ * Where a photo goes, next to the learned meal photos. Hidden when this app has no AI at all (nothing to
+ * explain then), and never a prompt: it only says what the family chose and where to change it.
+ */
+function PhotoAiCard({ patientId, onOpenAi }: { patientId: string; onOpenAi?: () => void }) {
+  const ai = useAiSettings(patientId);
+  if (ai.loading || !ai.available || !ai.settings) return null;
+  const view = switchView(ai.settings.photos, "photos");
+  return (
+    <SettingsCard
+      icon={ScanLine}
+      tone="meds"
+      title="फोटो और आवाज़ पढ़ने में AI (Photo & voice AI)"
+      description="BP या वज़न की मशीन, थाली और दवाई की फोटो, और छोटी आवाज़ रिकॉर्डिंग पढ़ने के लिए बाहरी AI सेवा का इस्तेमाल।"
+      action={
+        <Badge variant={STATE_BADGE[view.state]}>
+          <span lang="hi">{view.hi}</span>
+        </Badge>
+      }
+    >
+      <p lang="hi" className="text-sm leading-relaxed text-ink-muted">
+        {view.helperHi}
+      </p>
+      <p className="text-xs leading-relaxed text-ink-muted">{view.helperEn}</p>
+      <p lang="hi" className="text-xs leading-relaxed text-ink-muted">
+        फोटो और रिकॉर्डिंग हमारे सर्वर पर सेव नहीं होतीं। ऊपर की सीखी हुई फोटो के थंबनेल सिर्फ़ ऐप के अपने डेटाबेस में रहते हैं, AI सेवा को नहीं भेजे जाते।
+      </p>
+      {onOpenAi ? (
+        <Button type="button" variant="secondary" size="sm" onClick={onOpenAi}>
+          <span lang="hi">{ai.canChange ? "AI सहायता में बदलें" : "AI सहायता देखें"}</span>
+        </Button>
+      ) : null}
+    </SettingsCard>
+  );
+}
+
+export function DataPanel({ patient, canWrite = false, onOpenAi }: { patient: PatientProfile; canWrite?: boolean; onOpenAi?: () => void }) {
   const toast = useToast();
   const [busy, setBusy] = useState<Format | null>(null);
 
@@ -80,13 +122,15 @@ export function DataPanel({ patient, canWrite = false }: { patient: PatientProfi
 
       <LearnedPhotosCard patientId={patient.id} canWrite={canWrite} />
 
+      <PhotoAiCard patientId={patient.id} onOpenAi={onOpenAi} />
+
       <Card tone="sunken" className="space-y-3 text-sm text-ink-muted">
         <div className="flex items-center gap-1.5 font-semibold text-ink">
           <ShieldCheck aria-hidden className="h-4 w-4 text-brand" />
           SwasthTrack Health Companion
         </div>
         <p lang="hi" className="leading-relaxed">
-          आपके रिकॉर्ड सुरक्षित डेटाबेस में रहते हैं और सिर्फ़ उन्हीं को दिखते हैं जिन्हें आपने एक्सेस दिया है। सभी विश्लेषण नियम-आधारित हैं और ट्रैकिंग में मदद के लिए हैं, डॉक्टर की सलाह के विकल्प नहीं।
+          आपके रिकॉर्ड सुरक्षित डेटाबेस में रहते हैं और सिर्फ़ उन्हीं को दिखते हैं जिन्हें आपने एक्सेस दिया है। ज़्यादातर विश्लेषण नियम-आधारित हैं; AI सारांश वैकल्पिक हैं और &ldquo;AI सहायता&rdquo; टैब में बंद किए जा सकते हैं। यह सब ट्रैकिंग में मदद के लिए है, डॉक्टर की सलाह का विकल्प नहीं।
         </p>
         <nav aria-label="Legal and support" className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-line pt-3 font-semibold text-brand-ink">
           {LEGAL_LINKS.map((l) => (

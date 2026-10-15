@@ -11,6 +11,13 @@ installable web app (PWA).
 answers questions about the patient's own logged data, checks its numbers against
 deterministic rules, and says so honestly when there is not enough data.
 
+**AI is optional and family-controlled.** Summaries, photo reading of BP/weight
+displays and meal photos, voice and Ask can use outside AI services (Google
+Gemini, Groq, OpenRouter) through one server-side layer, `src/lib/ai`. Nothing is
+sent until an owner or editor says yes for that patient in Settings > AI सहायता,
+and every feature has a no-AI fallback: with every key removed the app behaves
+as it did before AI existed. See [AI features](#ai-features-optional) below.
+
 > **Medical disclaimer.** SwasthTrack is a tracking aid. It is not a diagnosis,
 > not a prescription and not a substitute for a doctor. Always follow the doctor's
 > advice, and call a doctor or emergency services for urgent symptoms. Read the
@@ -30,10 +37,10 @@ deterministic rules, and says so honestly when there is not enough data.
 | `/ask` | SOIE assistant: questions in Hindi or English over the logged data |
 | `/caregiver` | Caregiver companion dashboard |
 | `/profile` | Patient profile, medical background, prescriptions |
-| `/settings` | Targets and preferences, caregiver invite codes, members |
+| `/settings` | Targets and preferences, caregiver invite codes, members, the family's AI switches (AI सहायता tab) |
 | `/onboarding` | First-run setup: creates the patient and makes you its owner |
 | `/login` | Email + password sign-in, signup with email code, password reset, optional email-code sign-in |
-| `/simulation-lab` | Developer and acceptance-test tools (admin accounts only) |
+| `/simulation-lab` | AI service status (keys by count, models, cooling, usage, "check now") and acceptance-test tools (admin accounts only) |
 | `/about`, `/contact`, `/privacy`, `/terms`, `/medical-disclaimer` | Information and policy pages |
 
 ## Stack
@@ -42,7 +49,7 @@ deterministic rules, and says so honestly when there is not enough data.
 - Tailwind CSS v4 with a design-token system in `src/app/globals.css`
 - MySQL (`mysql2`) with the app's own e-mail-code sign-in; every query is authorised on the server
 - recharts for charts, motion for animation, lucide-react for icons
-- Anthropic SDK for the SOIE language model (server side only)
+- AI services (Google Gemini, Groq, OpenRouter) behind one server-side router, `src/lib/ai`; keys never reach the browser
 
 **Heads-up: this is not the Next.js you may know.** `AGENTS.md` warns that this
 Next.js version has breaking changes in APIs, conventions and file structure.
@@ -73,6 +80,9 @@ Open <http://localhost:3000>. Scripts in `package.json`:
 | `npm run db:import-supabase` | One-time copy of the old Supabase data into MySQL, with checksums |
 | `npm run food:import` | Optional: copy the bundled food catalogue into the database |
 | `npm run soie:eval`, `npm run soie:wire` | Ask-assistant checks (no database or key needed) |
+| `npm run ai:eval` | AI-layer checks against a fake provider (no network, database or key needed) |
+| `npm run ai:db-test` | AI routes against a real MySQL `*_test` database and a fake provider |
+| `npm run ai:live` | A few real requests to the providers whose keys are in `.env.local` |
 
 Dependencies are installed with `npm install` the first time.
 
@@ -83,10 +93,11 @@ Dependencies are installed with `npm install` the first time.
 | `DATABASE_URL` | Server only | `mysql://user:password@host:3306/swasthtrack` (`?ssl=true` for hosted databases) |
 | `AUTH_SECRET` | Server only | Random 32+ characters; keys the sign-in code hashes |
 | `SMTP_*` / `RESEND_API_KEY`, `EMAIL_FROM` | Server only | Sends the 6-digit sign-in codes and report e-mails |
-| `ANTHROPIC_API_KEY` | Server only | SOIE language model (optional) |
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` | Server only | AI services (all optional; any one is enough). Extra keys: `GEMINI_API_KEY_2` ... `_9` or `GEMINI_API_KEYS=a,b` |
+| `AI_PRIVACY`, `GEMINI_PLAN`, `AI_ENABLED`, `AI_FEATURES_OFF` | Server only | Where health content may go, the key's plan, and kill switches (see AI features below) |
 
-`.env.example` lists every variable, including the optional SOIE settings. Full
-table: [`docs/deployment.md`](docs/deployment.md).
+`.env.example` lists every variable, including the optional Ask and AI settings.
+Full table: [`docs/deployment.md`](docs/deployment.md).
 
 ### Database and sign-in setup
 
@@ -113,6 +124,8 @@ src/app/                 App Router pages (one folder per route) and API routes
   api/auth/              sign-up, sign-in, e-mail codes, sessions (cookie)
   api/db/                the data gateway: the browser's only way to the database
   api/soie/              SOIE endpoint (session-cookie authenticated)
+  api/ai/                AI settings (per-patient switches), status/diagnostics, daily notes
+  api/vision/            photo reading (BP / weight display, meal photo)
   manifest.ts            PWA manifest
 src/components/
   ask/ caregiver/ dashboard/ food/ forms/ health/ medicines/ reports/ timeline/
@@ -129,6 +142,7 @@ src/lib/auth/            accounts, e-mail codes, sessions (server) + client-sess
 src/services/            data layer and analytics (patient-service, settings-service,
                          reports, insights, wellness score, ...)
 src/services/soie/       SOIE types, normalisation and evaluation
+src/lib/ai/              the AI layer: router, key rotation, consent, cache, verification (server only; docs/ai.md)
 src/types/               shared TypeScript types
 db/mysql/schema.sql      the database schema (idempotent)
 scripts/db/              migrate, db-test, link-patient, migrate-from-supabase, import-food-catalogue
@@ -162,6 +176,50 @@ docs/                    database.md, auth-setup.md, deployment.md, ...
   contain no readings and signing out clears them, together with the PWA shell cache.
 - **Secrets.** The database password, `AUTH_SECRET`, SMTP and AI keys are server-only. Never commit secrets;
   rotate any key that was ever committed (see `docs/deployment.md`).
+
+## AI features (optional)
+
+Everything that calls a language, vision or speech model goes through `src/lib/ai`
+on the server. The reference is [`docs/ai.md`](docs/ai.md); the short version:
+
+- **Keys.** Set any of `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY` in the
+  server environment. On Vercel add each variable for **Production and Preview**,
+  then Redeploy (a preview build without them runs on the rules only). Never use a
+  `NEXT_PUBLIC_` prefix. With no key at all the app runs on its own rules and
+  Settings > AI says that AI is not turned on.
+- **Rotating a key.** Add the new key as `GEMINI_API_KEY_2` (or add it to
+  `GEMINI_API_KEYS=a,b`), redeploy, check Simulation Lab > AI services, then remove
+  the old one. Keys rotate automatically and are spares for each other; a refused key
+  cools down for 30 minutes and the next one is used. Revoke any key that was ever
+  pasted into a chat, a screenshot or an issue.
+- **Privacy mode.** `AI_PRIVACY=balanced` (default) sends health content to providers
+  that do not train on it first, and may fall back to the others; `strict` never
+  lets health or identifying content reach a provider that may train on it;
+  `performance` ignores that. A free Gemini or OpenRouter key counts as "may train";
+  set `GEMINI_PLAN=paid` (or `OPENROUTER_PLAN=paid`) only when billing is really on
+  for that key. Groq is treated as non-training by default.
+- **The family decides.** Per patient, two switches, each *never asked / yes / no*:
+  summaries and answers (figures without names, questions), and photos and voice. An
+  owner or editor changes them in Settings > AI सहायता (also offered once in
+  onboarding and at the first photo or microphone tap); viewers can read them. Until
+  a switch is *yes* nothing is sent for it. Switching text off also deletes the
+  patient's saved AI notes. Names, e-mail addresses, phone numbers and passwords are
+  never sent, and photos and recordings are not stored.
+- **Honest copy.** The lists of what is sent, to whom and what is never sent live in
+  `src/lib/ai-disclosure.ts` and feed the Settings tab, the consent dialog and the
+  Privacy Policy, so they cannot drift. Change a provider or what is sent only
+  together with that file and `/privacy`.
+- **Switching off.** `AI_ENABLED=false` for everything, `AI_FEATURES_OFF=brief,voice`
+  for single features (names in `docs/ai.md`), or the family's own switches.
+- **Limits.** `AI_RATE_LIMIT_PER_HOUR`, `AI_PATIENT_DAILY_LIMIT` and
+  `AI_GLOBAL_DAILY_LIMIT` keep free tiers from running out; cache hits are free.
+- **Diagnostics.** Admins see providers by key count, models, what is cooling down and
+  why, usage for the whole deployment, whether the AI tables exist, and a rate-limited
+  "check now" in Simulation Lab (`/api/ai/status`). Keys are never shown.
+- **Database.** The AI tables (`ai_cache`, `ai_events`, `patient_ai_settings`) are
+  server-only and created on first use; on a host that does not allow `CREATE TABLE`
+  to the app's user run `npm run db:migrate` once. Settings > AI says so when they
+  are missing.
 
 ## Dates and clinical rules
 

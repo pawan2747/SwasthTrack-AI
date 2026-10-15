@@ -8,17 +8,20 @@ import type { DbClient } from "../builder";
 
 export class HttpError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Optional machine-readable reason (the message may be shown to people; routes and clients branch on this). */
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = "HttpError";
     this.status = status;
+    this.code = code;
   }
 }
 
 /** Turn any thrown value into a JSON Response with a safe message. */
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError) {
-    return Response.json({ error: err.message }, { status: err.status });
+    return Response.json(err.code ? { error: err.message, code: err.code } : { error: err.message }, { status: err.status });
   }
   console.error("Unhandled API error:", err);
   return Response.json({ error: "Something went wrong on the server" }, { status: 500 });

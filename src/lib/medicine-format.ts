@@ -116,3 +116,65 @@ export function formatMinutes(minutes: number): string {
   const rest = m % 60;
   return rest === 0 ? `${h} घं` : `${h} घं ${rest} मि`;
 }
+
+// ---------------------------------------------------------------------------
+// Pattern wording: fixed copy for the Medicines page card and for model-phrased notes
+// (the model never writes these; code appends them after the checked text)
+// ---------------------------------------------------------------------------
+
+/**
+ * The one fixed safety line after any missed-dose statement. It only refers the family to the doctor or
+ * pharmacist and says nothing about taking, skipping or changing a dose beyond "do not double".
+ */
+export const MEDICINE_SAFETY_LINE = {
+  hi: "अगली खुराक अपने आप दोगुनी न करें; डॉक्टर या फार्मासिस्ट से पूछें।",
+  en: "Do not double the next dose on your own; ask the doctor or pharmacist.",
+} as const;
+
+export type MedicineNudgeId = "tick_if_taken" | "tick_after_taking" | "ask_missed_rule";
+
+/**
+ * What the family may be pointed at. Only two kinds of action exist here: "record it in the app" and "ask the
+ * doctor or pharmacist". Nothing starts, stops, moves or changes a dose, a time or a medicine.
+ */
+export const NUDGES: Record<MedicineNudgeId, { hi: string; en: string }> = {
+  tick_if_taken: {
+    hi: "अगर दवाई ली जा चुकी है तो उस दिन की सूची खोलकर ऐप में टिक कर दें।",
+    en: "If the medicine was taken, open that day in the app and tick it.",
+  },
+  tick_after_taking: {
+    hi: "दवाई लेते ही ऐप में टिक कर दें, ताकि रिकॉर्ड सही रहे।",
+    en: "Tick it in the app right after it is taken, so the record stays correct.",
+  },
+  ask_missed_rule: {
+    hi: "छूटी हुई खुराक के बारे में क्या करना है, यह डॉक्टर या फार्मासिस्ट से पूछें।",
+    en: "Ask the doctor or pharmacist what to do about a missed dose.",
+  },
+};
+
+export type DoctorQuestionId = "missed_dose_rule" | "confirm_schedule" | "remember_help";
+
+/** Questions the family can take to the doctor or pharmacist. Fixed copy; the model never writes a question. */
+export const DOCTOR_QUESTIONS: Record<DoctorQuestionId, { hi: string; en: string }> = {
+  missed_dose_rule: {
+    hi: "कोई खुराक छूट जाए तो इस दवाई के लिए क्या करना सही है?",
+    en: "What should be done if a dose of this medicine is missed?",
+  },
+  confirm_schedule: {
+    hi: "सभी दवाइयाँ किस समय और खाने से पहले या बाद, किस तरह लेनी हैं, यह एक बार फिर बता दीजिए।",
+    en: "Please confirm when, and how (before or after food), each medicine should be taken.",
+  },
+  remember_help: {
+    hi: "दवाइयाँ याद रखने का कोई आसान तरीका क्या हो सकता है?",
+    en: "Is there an easy way to help remember the medicines?",
+  },
+};
+
+/**
+ * Fixed line on the screen that turns a photo or pasted prescription into medicine rows. Written here, never by a
+ * model: the app copies what the paper says, gives no advice, and a change of medicine or dose is the doctor's call.
+ */
+export const MEDICINE_PHOTO_SAFETY = {
+  hi: "ऐप सिर्फ़ पर्ची में लिखी बात उतारता है, कोई सलाह नहीं देता। दवाई या खुराक बदलने का फ़ैसला हमेशा डॉक्टर से पूछकर करें।",
+  en: "The app only copies what is written on the paper and gives no advice. Always ask the doctor before changing a medicine or a dose.",
+} as const;

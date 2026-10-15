@@ -2,7 +2,7 @@
  * Food-name normalisation and the personalised quick-food ranking (pure).
  */
 import { ageInDays } from "./dates";
-import { eachIST, toISTDate, todayIST } from "../health-rules";
+import { SODIUM_IDEAL_MG_PER_DAY, SODIUM_LIMIT_MG_PER_DAY, eachIST, toISTDate, todayIST } from "../health-rules";
 
 /**
  * Stable key for a food name. Unicode-aware: Devanagari letters, digits and
@@ -232,6 +232,8 @@ export interface FoodLogTotalsInput {
   carbs_g: number | null;
   fat_g: number | null;
   fibre_g: number | null;
+  /** Sodium in mg. null / missing means UNKNOWN (a custom, quick or hand-typed item), never 0. */
+  sodium_mg?: number | null;
   consumed_at: string;
 }
 
@@ -243,6 +245,13 @@ export interface FoodTotals {
   fibre: number;
   /** Number of logged items. */
   entries: number;
+  /**
+   * Sodium in mg summed over the items that carry a value (a lower bound when `sodiumItems` < `entries`).
+   * Read it together with `sodiumItems`: with no sodium item it is "unknown", not 0 mg.
+   */
+  sodium?: number;
+  /** How many of the logged items carry sodium data. */
+  sodiumItems?: number;
 }
 
 export interface FoodDayTotals extends FoodTotals {
@@ -252,8 +261,11 @@ export interface FoodDayTotals extends FoodTotals {
 
 const num = (v: number | null | undefined): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
-export function sumFoodLogs(logs: Array<Omit<FoodLogTotalsInput, "consumed_at">>): FoodTotals {
-  const t: FoodTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, entries: 0 };
+/** A sodium value counts only when it is a real number: null, undefined and NaN are unknown. */
+const hasSodium = (v: number | null | undefined): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+
+export function sumFoodLogs(logs: Array<Omit<FoodLogTotalsInput, "consumed_at">>): FoodTotals & { sodium: number; sodiumItems: number } {
+  const t = { calories: 0, protein: 0, carbs: 0, fat: 0, fibre: 0, entries: 0, sodium: 0, sodiumItems: 0 };
   for (const l of logs) {
     t.calories += num(l.calories);
     t.protein += num(l.protein_g);
@@ -261,6 +273,10 @@ export function sumFoodLogs(logs: Array<Omit<FoodLogTotalsInput, "consumed_at">>
     t.fat += num(l.fat_g);
     t.fibre += num(l.fibre_g);
     t.entries += 1;
+    if (hasSodium(l.sodium_mg)) {
+      t.sodium += l.sodium_mg;
+      t.sodiumItems += 1;
+    }
   }
   return t;
 }
@@ -317,6 +333,15 @@ export interface FoodHistorySummary {
   withinTarget: number;
   /** Completed logged days over the target. */
   overTarget: number;
+  /**
+   * Mean sodium (mg) per day over the same days, counting only days with at least one item that carries sodium data
+   * (a day with none is unknown, not 0). A lower bound when `sodiumCoveragePct` < 100. null when no day has data.
+   */
+  avgSodium?: number | null;
+  /** Whole percent of the logged items (same days) that carry sodium data; null when nothing is logged. */
+  sodiumCoveragePct?: number | null;
+  /** How many days `avgSodium` is the mean of. */
+  sodiumDays?: number;
 }
 
 export function summarizeFoodHistory(days: FoodDayTotals[], target: number, today: string): FoodHistorySummary {
@@ -325,6 +350,9 @@ export function summarizeFoodHistory(days: FoodDayTotals[], target: number, toda
   const basis = completed.length > 0 ? completed : logged;
   const mean = (pick: (d: FoodDayTotals) => number) =>
     basis.length > 0 ? Math.round(basis.reduce((s, d) => s + pick(d), 0) / basis.length) : null;
+  const withSodium = basis.filter((d) => (d.sodiumItems ?? 0) > 0);
+  const basisEntries = basis.reduce((s, d) => s + d.entries, 0);
+  const basisSodiumItems = basis.reduce((s, d) => s + (d.sodiumItems ?? 0), 0);
   return {
     loggedDays: logged.length,
     completedLoggedDays: completed.length,
@@ -332,5 +360,74 @@ export function summarizeFoodHistory(days: FoodDayTotals[], target: number, toda
     avgProtein: mean((d) => d.protein),
     withinTarget: completed.filter((d) => d.calories <= target).length,
     overTarget: completed.filter((d) => d.calories > target).length,
+    avgSodium: withSodium.length > 0 ? Math.round(withSodium.reduce((s, d) => s + (d.sodium ?? 0), 0) / withSodium.length) : null,
+    sodiumCoveragePct: basisEntries > 0 ? Math.round((basisSodiumItems / basisEntries) * 100) : null,
+    sodiumDays: withSodium.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Sodium, as the Food page words it (pure, so the wording can be tested)
+// ---------------------------------------------------------------------------
+
+/** "1820" -> "1,820" (no Intl: the same string in Node, in the browser and in the tests). */
+export function formatMg(n: number): string {
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+export interface SodiumDescription {
+  /** The estimate in mg, rounded to the nearest 10. */
+  mg: number;
+  /** "~1,820 mg". */
+  valueText: string;
+  entries: number;
+  items: number;
+  /** Some logged items have no sodium data, so the real amount can be higher. */
+  partial: boolean;
+  /** "3 में से 2 चीज़ों में सोडियम का डेटा है; असली मात्रा ज़्यादा हो सकती है" (or "सभी 3 चीज़ों में ..."). */
+  coverageText: string;
+  /** Salt added at the plate is not logged anywhere. */
+  untrackedText: string;
+  /** What the two marks on the bar are. */
+  referenceText: string;
+  /** Bar scale in mg, the fill and the two reference marks as 0..100 positions on it. */
+  scaleMax: number;
+  fillPct: number;
+  marks: Array<{ mg: number; pct: number }>;
+  /** Screen-reader sentence for the bar. */
+  ariaLabel: string;
+}
+
+/**
+ * The sodium tile's numbers and words, or null when no logged item carries sodium data (then the tile is not shown).
+ * The framing is deliberately neutral: the catalogue's recipes assume salt, so a normal day lands above 2,300 mg,
+ * and the page says what is counted and what is not instead of grading the day.
+ */
+export function describeSodium(t: { sodium?: number; sodiumItems?: number; entries: number }): SodiumDescription | null {
+  const items = t.sodiumItems ?? 0;
+  if (items <= 0 || t.entries <= 0) return null;
+  const mg = Math.max(0, Math.round((t.sodium ?? 0) / 10) * 10);
+  const partial = items < t.entries;
+  const scaleMax = Math.max(3000, Math.ceil((mg * 1.1) / 500) * 500);
+  const pct = (v: number) => Math.round((Math.min(v, scaleMax) / scaleMax) * 1000) / 10;
+  const marks = [SODIUM_IDEAL_MG_PER_DAY, SODIUM_LIMIT_MG_PER_DAY].map((v) => ({ mg: v, pct: pct(v) }));
+  const coverageText = partial
+    ? `${t.entries} में से ${items} चीज़ों में सोडियम का डेटा है; असली मात्रा ज़्यादा हो सकती है`
+    : `सभी ${t.entries} चीज़ों में सोडियम का डेटा है`;
+  const untrackedText = "थाली में ऊपर से डाला गया नमक इसमें शामिल नहीं है";
+  const referenceText = `निशान: ${formatMg(SODIUM_IDEAL_MG_PER_DAY)} mg (BP के लिए आदर्श) · ${formatMg(SODIUM_LIMIT_MG_PER_DAY)} mg (सामान्य संदर्भ)`;
+  return {
+    mg,
+    valueText: `~${formatMg(mg)} mg`,
+    entries: t.entries,
+    items,
+    partial,
+    coverageText,
+    untrackedText,
+    referenceText,
+    scaleMax,
+    fillPct: pct(mg),
+    marks,
+    ariaLabel: `सोडियम लगभग ${formatMg(mg)} mg। ${coverageText}। ${untrackedText}।`,
   };
 }

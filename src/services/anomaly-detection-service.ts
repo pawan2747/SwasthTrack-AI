@@ -1,4 +1,4 @@
-import { addDaysIST, todayIST } from "@/lib/health-rules";
+import { addDaysIST, PATTERN_WEEKDAY_WINDOW_DAYS, todayIST } from "@/lib/health-rules";
 import { buildDoseRecords } from "@/lib/analytics/adherence";
 import {
   detectAnomalies,
@@ -90,7 +90,8 @@ export async function detectHealthAnomaliesAndTrends(patientId: string): Promise
     steps: activity.usable.map((a) => ({ day: a.date, steps: a.steps })),
     sleep: sleep.usable.map((s) => ({ day: s.date, hours: Number(s.sleep_hours) })),
     dailyCalories,
-    doses: buildDoseRecords(series.medicines, series.medicineLogs, addDaysIST(today, -13), today),
+    // 28 days: the weekday-pattern rule needs four of each weekday (the series already holds 35 days).
+    doses: buildDoseRecords(series.medicines, series.medicineLogs, addDaysIST(today, -(PATTERN_WEEKDAY_WINDOW_DAYS - 1)), today),
     lastLogDay,
     goals: { stepGoal: settings.daily_step_goal, calorieTarget: settings.daily_calorie_target },
     alerts: settings.alerts_enabled,

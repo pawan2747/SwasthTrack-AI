@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Camera,
   Footprints,
   Heart,
   HeartPulse,
@@ -72,9 +73,16 @@ const FEATURES: Feature[] = [
   {
     title: "Ask",
     hindi: "सवाल पूछें",
-    desc: "Ask questions about the records in plain Hindi or English and get answers drawn from the data.",
+    desc: "Ask questions about the records in plain Hindi or English. Answers come from the data and every number is checked against the records; AI is optional and can be switched off.",
     icon: MessageCircle,
     tone: "neutral",
+  },
+  {
+    title: "Camera",
+    hindi: "कैमरे से दर्ज करें",
+    desc: "Read the numbers on a blood-pressure monitor or scale from a photo, or get dish suggestions from a meal photo. You always check before anything is saved, and the AI part is optional.",
+    icon: Camera,
+    tone: "bp",
   },
   {
     title: "Reports for the doctor",

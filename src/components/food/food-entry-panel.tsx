@@ -22,7 +22,9 @@ import {
   oilCalories,
   type Confidence,
 } from "@/components/food/food-math";
+import { MealTextBox } from "@/components/food/meal-text-box";
 import { FoodPhotoDialog } from "@/components/vision/food-photo-dialog";
+import { MealPhotoHint } from "@/components/vision/meal-photo-hint";
 import { categoryLabel, foodSubtitle, loggedUnit } from "@/lib/food/catalogue";
 import { todayIST } from "@/lib/health-rules";
 import { cn, getExactFoodEmoji, readLocalPref, writeLocalPref } from "@/lib/utils";
@@ -857,6 +859,9 @@ export function FoodEntryPanel({
     });
   }
 
+  // The meal box and the photo dialog also pass `{ complete }` (false = part of the meal is still on their review
+  // list). This panel sits on the page and never closes anything itself, so a partial save refreshes it the same way:
+  // the review list or photo dialog stays on screen with what is left.
   const finishEntry = () => {
     setPicked(null);
     quick.reload();
@@ -903,10 +908,14 @@ export function FoodEntryPanel({
         </div>
 
         {!picked && !custom ? (
+          <MealTextBox patientId={patientId} mealType={mealType} logDate={targetDate} onLogged={finishEntry} />
+        ) : null}
+
+        {!picked && !custom ? (
           <div className="tile flex flex-col gap-2 rounded-card p-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="min-w-0 text-sm text-ink">
               <span lang="hi" className="font-semibold">थाली की फोटो लें, ऐप खाना पहचानेगा।</span>{" "}
-              <span lang="hi" className="text-ink-muted">फोटो फ़ोन पर ही पहचानी जाती है; जो आप दर्ज करेंगे, वह याद रहेगा।</span>
+              <MealPhotoHint patientId={patientId} />
             </p>
             <Button variant="primary" className="shrink-0" onClick={() => setPhotoOpen(true)}>
               <Camera aria-hidden className="h-4 w-4" />

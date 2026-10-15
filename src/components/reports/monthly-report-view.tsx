@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Activity, Footprints, HeartPulse, Moon, Pill, Scale, Utensils, type LucideIcon } from "lucide-react";
+import { TrendNarrativeCard } from "@/components/ai/trend-narrative-card";
 import { metricChipClasses, type MetricTone } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/page";
 import { loadErrorMessage, useAsyncData } from "@/components/health/use-async-data";
@@ -205,6 +206,12 @@ export function MonthlyReportView({ patientId }: MonthlyReportViewProps) {
       </ChartCard>
 
       <PeriodCharts trend={data.trend} targets={data.targets} include={["score", "bp", "weight", "steps", "sleep", "calories"]} />
+
+      <TrendNarrativeCard
+        patientId={patientId}
+        query={{ view: "monthly", ...(atLatest ? {} : { endDate }) }}
+        enabled={atLatest && data.hasSufficientData}
+      />
 
       <InsightList title="Monthly observations" hindiTitle="महीने की बातें" items={data.personalizedInsights} />
 
